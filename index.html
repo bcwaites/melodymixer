@@ -1765,7 +1765,7 @@ function decodeState(encoded) {
 
 // ── TinyURL shortener ─────────────────────────────────────────────────────────
 // ── Share button ──────────────────────────────────────────────────────────────
-// Share button — calls TinyURL API via corsproxy.io to bypass CORS restrictions
+// Share button — calls TinyURL API directly (works from GitHub Pages)
 const TINYURL_KEY = 'dZ7RXi8cxWR8DcyajhuRfVtQsIYXN1Xh6rYWuZbmZkvwGAGmLsBBk1BdGTMJ';
 
 document.getElementById('btnShare').addEventListener('click', async function() {
@@ -1778,9 +1778,9 @@ document.getElementById('btnShare').addEventListener('click', async function() {
     bar.style.display = 'none'; return;
   }
 
-  // Build the full URL synchronously
+  // Build URL using the canonical GitHub Pages base
   const encoded = encodeState();
-  const base    = window.location.href.split('#')[0];
+  const base    = 'https://bcwaites.github.io/melodymixer/';
   const longUrl = base + '#' + encoded;
 
   // Show bar immediately — Copy always works as fallback
@@ -1789,13 +1789,13 @@ document.getElementById('btnShare').addEventListener('click', async function() {
   btn.disabled    = false;
   bar.style.display = 'flex';
 
-  // Try to shorten — corsproxy.io forwards the request with CORS headers
+  // Shorten via TinyURL API directly
   inp.value    = 'Shortening…';
   btn.disabled = true;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch('https://corsproxy.io/?https://api.tinyurl.com/create', {
+    const res = await fetch('https://api.tinyurl.com/create', {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
