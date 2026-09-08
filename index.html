@@ -1,0 +1,3010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Melody Mixer — Marimba Warehouse</title>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.8.6/build/opensheetmusicdisplay.min.js"></script>
+<style>
+/* ── Design tokens ──────────────────────────────────────────────────────────
+   Primary:   #FFFFFF (white)
+   Secondary: #1A1A1A (near-black)
+   Tertiary:  #6B6B6B (mid-gray)
+   Border:    #E0E0E0
+   Hover:     #F4F4F4
+   Accent:    #1A1A1A (black used as accent, like MW site)
+   Active bg: #F0F0F0
+──────────────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 14px; color: #1A1A1A; background: #F4F4F4;
+  height: 100vh; overflow: hidden;
+}
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 260px; min-width: 260px;
+  background: #FFFFFF;
+  border-right: 1px solid #E0E0E0;
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  transition: transform 0.25s ease;
+  height: 100vh; flex-shrink: 0;
+}
+.sidebar.collapsed { transform: translateX(-260px); margin-right: -260px; }
+
+.sidebar-header {
+  padding: 16px 16px 14px;
+  font-weight: 700; font-size: 11px; color: #1A1A1A;
+  border-bottom: 2px solid #1A1A1A;
+  display: flex; align-items: center; gap: 8px;
+  text-transform: uppercase; letter-spacing: .12em;
+  position: relative;
+}
+
+/* ── Accordion ── */
+.acc-section { border-bottom: 1px solid #E8E8E8; }
+.acc-trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: none; border: none; cursor: pointer;
+  font-size: 10px; font-weight: 700; color: #6B6B6B;
+  text-transform: uppercase; letter-spacing: .1em; text-align: left;
+  transition: background .1s, color .1s;
+}
+.acc-trigger:hover { background: #F4F4F4; color: #1A1A1A; }
+.acc-trigger.open { color: #1A1A1A; background: #F8F8F8; }
+.acc-chevron {
+  width: 13px; height: 13px; flex-shrink: 0; fill: none;
+  stroke: currentColor; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+.acc-trigger.open .acc-chevron { transform: rotate(180deg); }
+.acc-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.25s ease, padding 0.2s ease;
+  padding: 0 16px;
+}
+.acc-body.open { max-height: 900px; padding: 0 16px 14px; }
+
+.sub-label {
+  font-size: 9px; color: #9B9B9B; text-transform: uppercase;
+  letter-spacing: .1em; margin: 12px 0 6px; font-weight: 600;
+}
+
+/* ── Form controls ── */
+.radio-group, .check-group { display: flex; flex-direction: column; gap: 7px; }
+.radio-item, .check-item { display: flex; align-items: center; gap: 8px; }
+.radio-item input, .check-item input {
+  width: 15px; height: 15px; cursor: pointer;
+  accent-color: #1A1A1A; flex-shrink: 0;
+}
+.radio-item label, .check-item label { font-size: 13px; color: #1A1A1A; cursor: pointer; }
+.radio-item.disabled, .check-item.disabled { opacity: 0.3; pointer-events: none; }
+.sidebar-field { display: flex; flex-direction: column; gap: 6px; }
+.field-label { font-size: 12px; color: #6B6B6B; }
+.sidebar-field input[type=range] { width: 100%; cursor: pointer; accent-color: #1A1A1A; }
+select {
+  width: 100%; font-size: 13px; padding: 5px 8px;
+  border: 1px solid #D0D0D0; border-radius: 4px;
+  background: #FFFFFF; color: #1A1A1A;
+}
+
+/* ── Main area ── */
+.main { flex: 1; padding: 20px; min-width: 0; overflow-y: auto; height: 100vh; background: #F4F4F4; }
+
+/* ── Toolbar ── */
+.toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+
+.btn-settings {
+  font-size: 12px; padding: 8px 14px; border-radius: 3px;
+  border: 1px solid #D0D0D0; background: #FFFFFF; color: #1A1A1A;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  font-weight: 500; letter-spacing: .02em;
+  transition: background .1s, border-color .1s;
+}
+.btn-settings:hover { background: #F4F4F4; border-color: #1A1A1A; }
+.btn-settings.active { background: #1A1A1A; color: #FFFFFF; border-color: #1A1A1A; }
+
+.btn-gen {
+  font-size: 12px; padding: 8px 20px; border-radius: 3px;
+  border: none; background: #1A1A1A; color: #FFFFFF;
+  cursor: pointer; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; transition: background .1s;
+}
+.btn-gen:hover { background: #3A3A3A; }
+
+.btn-play {
+  font-size: 12px; padding: 8px 16px; border-radius: 3px;
+  border: 1px solid #1A1A1A; background: #FFFFFF; color: #1A1A1A;
+  cursor: pointer; font-weight: 600;
+  transition: background .1s, color .1s;
+}
+.btn-play:hover { background: #1A1A1A; color: #FFFFFF; }
+
+.btn-stop {
+  font-size: 12px; padding: 8px 16px; border-radius: 3px;
+  border: 1px solid #D0D0D0; background: #FFFFFF; color: #6B6B6B;
+  cursor: pointer; font-weight: 500;
+  transition: background .1s, color .1s;
+}
+.btn-stop:hover { background: #F4F4F4; color: #1A1A1A; border-color: #1A1A1A; }
+
+.btn-zoom {
+  font-size: 15px; width: 30px; height: 30px; border-radius: 3px;
+  border: 1px solid #D0D0D0; background: #FFFFFF; color: #1A1A1A;
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; line-height: 1; padding: 0;
+  transition: background .1s;
+}
+.btn-zoom:hover { background: #F4F4F4; border-color: #1A1A1A; }
+
+#zoomLabel { font-size: 11px; color: #6B6B6B; min-width: 36px; text-align: center; font-weight: 600; }
+
+/* ── Staff card ── */
+.staff-card {
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+  padding: 20px 16px;
+  min-height: 160px;
+  overflow-x: auto;
+}
+#osmd-container { width: 100%; }
+
+/* ── Beat dots ── */
+
+/* ── Misc ── */
+.info { font-size: 11px; color: #9B9B9B; margin-top: 10px; letter-spacing: .01em; }
+#error-msg { color: #C0392B; font-size: 12px; margin-top: 10px; padding: 10px 14px; background: #FEF0EE; border-left: 3px solid #C0392B; border-radius: 2px; display: none; }
+.icon { width: 14px; height: 14px; fill: currentColor; }
+
+/* ── New controls ── */
+.ctrl-group { display:flex; align-items:center; gap:4px; }
+.ctrl-label  { font-size:11px; color:#6B6B6B; min-width:36px; text-align:center; font-weight:600; }
+
+.btn-toggle {
+  font-size:11px; padding:6px 12px; border-radius:3px;
+  border:1px solid #D0D0D0; background:#FFFFFF; color:#6B6B6B;
+  cursor:pointer; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+  transition:all .1s;
+}
+.btn-toggle:hover { border-color:#1A1A1A; color:#1A1A1A; }
+.btn-toggle.active { background:#1A1A1A; color:#FFFFFF; border-color:#1A1A1A; }
+
+/* ── Compact horizontal volume row ── */
+.mixer-row {
+  display:flex; align-items:center; gap:8px;
+  margin-bottom:10px; flex-wrap:wrap;
+}
+.mixer-label { font-size:10px; font-weight:700; color:#6B6B6B; text-transform:uppercase; letter-spacing:.08em; }
+.mixer-ch-label { font-size:11px; color:#6B6B6B; }
+.mixer-slider { width:90px; cursor:pointer; accent-color:#1A1A1A; }
+.mixer-val { font-size:11px; color:#1A1A1A; font-weight:600; min-width:22px; }
+.mixer-sep { color:#D0D0D0; font-size:12px; margin:0 2px; }
+.play-status { font-size:11px; color:#9B9B9B; margin-left:6px; letter-spacing:.02em; }
+
+/* ── Bottom bar / share ── */
+.bottom-bar {
+  margin-top:16px; padding-top:12px;
+  border-top:1px solid #E8E8E8;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+
+.keyboard-hint {
+  font-size:10px; color:#9B9B9B; letter-spacing:.04em;
+  margin-top:4px; font-family:monospace;
+}
+
+.btn-pdf {
+  font-size:11px; padding:6px 12px; border-radius:3px;
+  border:1px solid #1A1A1A; background:#1A1A1A; color:#FFFFFF;
+  cursor:pointer; font-weight:600; transition:all .1s; white-space:nowrap;
+}
+.btn-pdf:hover { background:#3A3A3A; }
+
+/* ── Print / PDF stylesheet ───────────────────────────────────────────────── */
+@media print {
+  /* Hide everything except the staff */
+  .sidebar, .toolbar, .mixer-row, .share-bar, .bottom-bar,
+  .brand-footer, .info, .keyboard-hint, #error-msg,
+  .sidebar-backdrop, #shareBar {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .app { display: block !important; height: auto !important; overflow: visible !important; }
+  .main { height: auto !important; overflow: visible !important; padding: 0 !important; }
+
+  .staff-card {
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Scale staff to fill the page width */
+  #staff-scale-wrap {
+    transform: none !important;
+    width: 100% !important;
+  }
+  #osmd-container svg {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Print header with title and settings info */
+  .print-header {
+    display: block !important;
+    font-family: Helvetica, Arial, sans-serif;
+    margin-bottom: 12px;
+  }
+
+  @page {
+    size: letter landscape;
+    margin: 0.6in 0.5in 0.6in 0.5in;
+  }
+}
+  border:1px solid #D0D0D0; background:#FFFFFF; color:#9B9B9B;
+  cursor:pointer; font-weight:500; transition:all .1s;
+}
+.btn-reset:hover { border-color:#1A1A1A; color:#1A1A1A; }
+
+.brand-footer {
+  margin-top:10px; padding-bottom:16px;
+  display:flex; align-items:center; gap:8px;
+}
+.brand-name {
+  font-size:11px; font-weight:700; color:#1A1A1A;
+  text-transform:uppercase; letter-spacing:.1em;
+}
+.brand-sep { font-size:11px; color:#D0D0D0; }
+.brand-link {
+  font-size:11px; color:#6B6B6B; text-decoration:none;
+  letter-spacing:.02em;
+}
+.brand-link:hover { color:#1A1A1A; text-decoration:underline; }
+.btn-share {
+  font-size:11px; padding:6px 14px; border-radius:3px;
+  border:1px solid #D0D0D0; background:#FFFFFF; color:#6B6B6B;
+  cursor:pointer; font-weight:500; transition:all .1s;
+}
+.btn-share:hover { border-color:#1A1A1A; color:#1A1A1A; }
+
+.share-bar {
+  display:flex; align-items:center; gap:8px;
+  background:#F8F8F8; border:1px solid #E0E0E0;
+  border-radius:3px; padding:8px 12px;
+  margin-top:8px; flex-wrap:wrap;
+}
+.share-label { font-size:11px; color:#6B6B6B; font-weight:600; white-space:nowrap; }
+.share-input {
+  flex:1; font-size:11px; padding:4px 8px; border:1px solid #D0D0D0;
+  border-radius:3px; background:#FFFFFF; color:#1A1A1A; min-width:200px;
+  font-family:monospace;
+}
+.share-copy {
+  font-size:11px; padding:5px 12px; border-radius:3px;
+  border:1px solid #1A1A1A; background:#1A1A1A; color:#FFFFFF;
+  cursor:pointer; font-weight:600; white-space:nowrap;
+}
+.share-copy:hover { background:#3A3A3A; }
+.range-wrap { padding: 4px 0 8px; }
+.range-labels { display:flex; justify-content:space-between; font-size:11px; color:#9B9B9B; margin-top:4px; }
+.range-row { display:flex; align-items:center; gap:8px; }
+.range-row span { font-size:11px; color:#1A1A1A; min-width:28px; text-align:center; font-weight:600; }
+input[type=range].dual { width:100%; accent-color:#1A1A1A; }
+
+/* Sidebar close button (mobile only) */
+.sidebar-close {
+  display: none; position: absolute; top: 12px; right: 12px;
+  width: 28px; height: 28px; border: none; background: none;
+  font-size: 18px; color: #6B6B6B; cursor: pointer;
+  align-items: center; justify-content: center; border-radius: 3px;
+}
+.sidebar-close:hover { background: #F4F4F4; color: #1A1A1A; }
+
+/* Backdrop (desktop hidden) */
+.sidebar-backdrop {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 199;
+}
+
+/* ── Mobile (≤768px) ────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0;
+    width: 100% !important; min-width: unset !important;
+    height: 100% !important; z-index: 200;
+    transform: translateX(-100%);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.2);
+  }
+  .sidebar.collapsed { transform: translateX(-100%); margin-right: 0; }
+  .sidebar.mobile-open { transform: translateX(0); }
+  .sidebar-close { display: flex; }
+  .sidebar-backdrop { display: none; } /* shown by JS when open */
+
+  .main { padding: 12px; }
+
+  .btn-settings, .btn-play, .btn-stop { padding: 10px 14px; font-size: 13px; min-height: 44px; }
+  .btn-gen { padding: 10px 16px; font-size: 13px; min-height: 44px; flex: 1; }
+  .btn-zoom { width: 36px; height: 36px; font-size: 18px; }
+
+  .staff-card { padding: 10px 6px; }
+
+  .acc-trigger { padding: 14px 16px; font-size: 11px; }
+  .acc-body.open { max-height: 80vh; overflow-y: auto; }
+
+  .radio-item, .check-item { padding: 4px 0; gap: 12px; }
+  .radio-item input, .check-item input { width: 20px; height: 20px; }
+  .radio-item label, .check-item label { font-size: 15px; }
+
+  select, input[type=range] { font-size: 16px !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Backdrop for mobile sidebar -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header" style="position:relative;cursor:pointer;" id="sidebarHeaderCollapse" title="Collapse settings">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      Settings
+      <svg id="sidebarCollapseChevron" style="width:14px;height:14px;fill:none;stroke:#6B6B6B;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-left:auto;transition:transform .25s ease;" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      <button class="sidebar-close" id="btnSidebarClose" aria-label="Close settings" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);">&#10005;</button>
+    </div>
+
+    <!-- OPEN by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-clef">
+        Clef
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-clef">
+        <div class="radio-group" id="clefGroup"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-ts">
+        Time signature
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-ts">
+        <div class="radio-group" id="timeSigGroup"></div>
+      </div>
+    </div>
+
+    <!-- OPEN by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-meas">
+        Measures
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-meas">
+        <div class="radio-group" id="measuresGroup"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-staff">
+        Staff lines
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-staff">
+        <div class="radio-group" id="staffGroup"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-interval">
+        Max interval
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-interval">
+        <div class="radio-group" id="intervalGroup"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-range">
+        Note range
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-range">
+        <div class="sidebar-field" style="margin-bottom:10px;">
+          <label class="field-label">High note: <strong id="rangeHighLabel">—</strong></label>
+          <input type="range" id="rangeHigh" min="0" max="7" value="7" step="1" style="width:100%;accent-color:#1a56db;">
+        </div>
+        <div class="sidebar-field">
+          <label class="field-label">Low note: <strong id="rangeLowLabel">—</strong></label>
+          <input type="range" id="rangeLow" min="0" max="4" value="0" step="1" style="width:100%;accent-color:#993C1D;">
+        </div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-notes">
+        Note values
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-notes">
+        <div class="sub-label">Simple</div>
+        <div class="check-group" id="noteSimpleGroup"></div>
+        <div class="sub-label">Beamed — same subdivision</div>
+        <div class="check-group" id="noteBeamedGroup"></div>
+        <div class="sub-label">Beamed — mixed</div>
+        <div class="check-group" id="noteMixedGroup"></div>
+        <div class="sub-label">Dotted rhythms</div>
+        <div class="check-group" id="noteDottedGroup"></div>
+        <div class="sub-label" id="compoundLabel" style="display:none;">Compound (6/8)</div>
+        <div class="check-group" id="noteCompoundGroup" style="display:none;"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-rests">
+        Rest values
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-rests">
+        <div class="check-group" id="restGroup"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-key">
+        Key &amp; accidentals
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-key">
+        <div style="font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Key signature</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;" id="keyGroup"></div>
+        <div style="font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Accidentals</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="accidentalGroup"></div>
+        <div style="margin-top:12px;" class="check-item">
+          <input type="checkbox" id="chkStartOnTonic">
+          <label for="chkStartOnTonic">Start on tonic</label>
+        </div>
+        <div style="margin-top:8px;" class="check-item">
+          <input type="checkbox" id="chkEndOnTonic">
+          <label for="chkEndOnTonic">End on tonic</label>
+        </div>
+        <p style="font-size:11px;color:#9B9B9B;margin-top:4px;line-height:1.4;">First and/or last note resolves to the root of the selected key.</p>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-voice">
+        Instrument voice
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-voice">
+        <div class="radio-group" id="voiceGroup"></div>
+      </div>
+    </div>
+
+    <!-- CLOSED by default -->
+    <div class="acc-section">
+      <button class="acc-trigger" data-target="acc-special">
+        Ties &amp; Double Stops
+        <svg class="acc-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="acc-body" id="acc-special">
+        <div class="sub-label">Tied notes</div>
+        <p style="font-size:10px;color:#9B9B9B;margin-bottom:6px;line-height:1.3;">Check any pattern to include ties.</p>
+        <div class="check-group" id="tieGroup"></div>
+        <div class="sub-label" style="margin-top:12px;">Double stops</div>
+        <div class="check-item">
+          <input type="checkbox" id="chkDoubleStop">
+          <label for="chkDoubleStop">Enable double stops</label>
+        </div>
+        <div id="doubleStopDensityWrap" style="display:none;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="field-label" style="white-space:nowrap;">Density</span>
+            <input type="range" id="doubleStopDensity" min="0" max="100" value="50" step="10"
+              style="flex:1;accent-color:#1A1A1A;">
+            <span id="doubleStopDensityVal" style="font-size:11px;color:#1A1A1A;font-weight:600;min-width:32px;text-align:right;">50%</span>
+          </div>
+          <div class="sub-label" style="margin-top:0;margin-bottom:6px;">Interval</div>
+          <div class="radio-group" id="doubleStopIntervalGroup"></div>
+          <p style="font-size:10px;color:#9B9B9B;margin-top:6px;line-height:1.3;">How often double stops appear (0% = never, 100% = every note).</p>
+        </div>
+        <p style="font-size:11px;color:#9B9B9B;margin-top:6px;line-height:1.4;">Two simultaneous pitches. Uses interval setting to determine the harmonic interval between them.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="main">
+    <!-- ── Toolbar row 1: primary actions ── -->
+    <div class="toolbar">
+      <button class="btn-settings active" id="btnSettings">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 15.5A3.5 3.5 0 018.5 12 3.5 3.5 0 0112 8.5a3.5 3.5 0 013.5 3.5 3.5 3.5 0 01-3.5 3.5m7.43-2.92c.04-.36.07-.72.07-1.08s-.03-.73-.07-1.08l2.32-1.82c.21-.16.27-.46.13-.7l-2.2-3.81c-.13-.24-.42-.32-.66-.24l-2.74 1.1c-.57-.44-1.18-.8-1.84-1.08L14 2.42C13.96 2.18 13.74 2 13.5 2h-3c-.24 0-.46.18-.5.42l-.42 2.45c-.66.28-1.27.64-1.84 1.08L5 4.85c-.24-.09-.53 0-.66.24l-2.2 3.81c-.14.24-.08.54.13.7l2.32 1.82C4.53 11.27 4.5 11.63 4.5 12s.03.73.07 1.08l-2.32 1.82c-.21.16-.27.46-.13.7l2.2 3.81c.13.24.42.32.66.24l2.74-1.1c.57.44 1.18.8 1.84 1.08l.42 2.45c.04.24.26.42.5.42h3c.24 0 .46-.18.5-.42l.42-2.45c.66-.28 1.27-.64 1.84-1.08l2.74 1.1c.24.09.53 0 .66-.24l2.2-3.81c.14-.24.08-.54-.13-.7l-2.32-1.82z"/></svg>
+        Settings
+      </button>
+      <button class="btn-gen" id="btnGen">Mix It Up!</button>
+      <button class="btn-play" id="btnPlay">&#9654; Play</button>
+      <button class="btn-stop" id="btnStop">&#9632; Stop</button>
+
+      <!-- Zoom controls -->
+      <div class="ctrl-group">
+        <button class="btn-zoom" id="btnZoomOut" title="Zoom out">&#8722;</button>
+        <span id="zoomLabel" class="ctrl-label">100%</span>
+        <button class="btn-zoom" id="btnZoomIn" title="Zoom in">&#43;</button>
+      </div>
+
+      <!-- Count-in toggle -->
+      <button class="btn-toggle" id="btnCountIn" title="2-bar count-in before playback">
+        Count-in
+      </button>
+
+      <!-- Cursor highlight toggle -->
+      <button class="btn-toggle" id="btnCursor" title="Highlight notes during playback">
+        Cursor
+      </button>
+
+      <!-- Share / Reset / PDF in toolbar -->
+      <button class="btn-share" id="btnShare" style="margin-left:auto;">&#128279; Share</button>
+      <button class="btn-pdf" id="btnPdf">&#128438; Save PDF</button>
+      <button class="btn-reset" id="btnReset">Reset</button>
+    </div>
+
+    <!-- Share link bar (appears below toolbar when Share clicked) -->
+    <div class="share-bar" id="shareBar" style="display:none;">
+      <span class="share-label">Link:</span>
+      <input class="share-input" id="shareInput" type="text" readonly>
+      <button class="share-copy" id="shareCopy" disabled>Copy</button>
+    </div>
+
+    <!-- ── Compact horizontal volume + tempo controls ── -->
+    <div class="mixer-row">
+      <span class="mixer-label">Vol:</span>
+      <span class="mixer-ch-label">Melody</span>
+      <input type="range" class="mixer-slider" id="faderMelody" min="0" max="100" value="80">
+      <span class="mixer-val" id="faderMelodyVal">80</span>
+      <span class="mixer-sep">|</span>
+      <span class="mixer-ch-label">Click</span>
+      <input type="range" class="mixer-slider" id="faderClick" min="0" max="100" value="50">
+      <span class="mixer-val" id="faderClickVal">50</span>
+      <span class="mixer-sep">|</span>
+      <span class="mixer-ch-label">Tempo</span>
+      <input type="range" class="mixer-slider" id="tempo" min="40" max="180" value="80" step="1" style="accent-color:#1a56db;">
+      <span class="mixer-val" id="tempoVal">80</span>
+      <span id="status" class="play-status"></span>
+    </div>
+    <div class="staff-card">
+      <!-- Print-only header: hidden on screen, shown when printing -->
+      <div class="print-header" style="display:none;">
+        <div style="font-size:15px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:2px;">Melody Mixer</div>
+        <div id="printInfo" style="font-size:10px;color:#666;"></div>
+      </div>
+      <div id="staff-scale-wrap" style="transform-origin:top left;">
+        <div id="osmd-container"></div>
+      </div>
+    </div>
+    <div class="info" id="info"></div>
+    <div class="keyboard-hint">&#9251; Play/Stop &nbsp;&nbsp; M Mix It Up!</div>
+    <div id="error-msg"></div>
+
+    <div class="brand-footer">
+      <span class="brand-name">Melody Mixer</span>
+      <span class="brand-sep">·</span>
+      <a class="brand-link" href="https://www.marimbawarehouse.com" target="_blank">Marimba Warehouse</a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Pitch sets ────────────────────────────────────────────────────────────────
+const PITCH_SETS = {
+  treble: {
+    1: [
+      // 1-line (B4): 2 ledger above (D5, E5... but keep it tight), 2 below (G4, A4)
+      // We extend with ledger lines: up to D5 above, down to G4 below
+      { step:'D', octave:5, freq:587, label:'D5' },  // ledger above
+      { step:'C', octave:5, freq:523, label:'C5' },  // just above line
+      { step:'B', octave:4, freq:494, label:'B4' },  // ON the line
+      { step:'A', octave:4, freq:440, label:'A4' },  // just below line
+      { step:'G', octave:4, freq:392, label:'G4' },  // ledger below
+    ],
+    2: [
+      // 2-line shows lines B4 (line 3) and D5 (line 4) of treble
+      // Range F4–F5: F4 is ledger below, G4 space below bottom line, up to F5 ledger above
+      { step:'F', octave:5, freq:698, label:'F5' },  // ledger above
+      { step:'E', octave:5, freq:659, label:'E5' },  // just above top line
+      { step:'D', octave:5, freq:587, label:'D5' },  // top line
+      { step:'C', octave:5, freq:523, label:'C5' },  // between lines
+      { step:'B', octave:4, freq:494, label:'B4' },  // bottom line
+      { step:'A', octave:4, freq:440, label:'A4' },  // just below bottom line
+      { step:'G', octave:4, freq:392, label:'G4' },  // space below bottom line
+      { step:'F', octave:4, freq:349, label:'F4' },  // ledger below
+    ],
+    3: [
+      // 3-line (B4, D5, F5): ledger above G5, below E4
+      { step:'G', octave:5, freq:784, label:'G5' },  // ledger above
+      { step:'F', octave:5, freq:698, label:'F5' },  // top line
+      { step:'E', octave:5, freq:659, label:'E5' },
+      { step:'D', octave:5, freq:587, label:'D5' },  // middle line
+      { step:'C', octave:5, freq:523, label:'C5' },
+      { step:'B', octave:4, freq:494, label:'B4' },  // bottom line
+      { step:'A', octave:4, freq:440, label:'A4' },
+      { step:'G', octave:4, freq:392, label:'G4' },
+      { step:'F', octave:4, freq:349, label:'F4' },
+      { step:'E', octave:4, freq:330, label:'E4' },  // ledger below
+    ],
+    5: [
+      // Full treble + 2 ledger lines above (A5, B5, C6) + 2 below (C4, B3)
+      { step:'C', octave:6, freq:1047, label:'C6' }, // 2nd ledger above
+      { step:'B', octave:5, freq:988,  label:'B5' }, // space above 1st ledger
+      { step:'A', octave:5, freq:880,  label:'A5' }, // 1st ledger above
+      { step:'G', octave:5, freq:784,  label:'G5' }, // just above staff (space)
+      { step:'F', octave:5, freq:698,  label:'F5' }, // line 5 (top)
+      { step:'E', octave:5, freq:659,  label:'E5' }, // space 4
+      { step:'D', octave:5, freq:587,  label:'D5' }, // line 4
+      { step:'C', octave:5, freq:523,  label:'C5' }, // space 3
+      { step:'B', octave:4, freq:494,  label:'B4' }, // line 3 (middle)
+      { step:'A', octave:4, freq:440,  label:'A4' }, // space 2
+      { step:'G', octave:4, freq:392,  label:'G4' }, // line 2
+      { step:'F', octave:4, freq:349,  label:'F4' }, // space 1
+      { step:'E', octave:4, freq:330,  label:'E4' }, // line 1 (bottom)
+      { step:'D', octave:4, freq:294,  label:'D4' }, // just below staff (space)
+      { step:'C', octave:4, freq:262,  label:'C4' }, // middle C (1st ledger below)
+      { step:'B', octave:3, freq:247,  label:'B3' }, // space below 1st ledger
+      { step:'A', octave:3, freq:220,  label:'A3' }, // 2nd ledger below
+    ],
+  },
+  bass: {
+    1: [
+      // 1-line (D3): ledger above E3, below C3
+      { step:'E', octave:3, freq:165, label:'E3' },  // ledger above
+      { step:'D', octave:3, freq:147, label:'D3' },  // ON the line
+      { step:'C', octave:3, freq:131, label:'C3' },  // ledger below
+    ],
+    2: [
+      // 2-line (B2, D3): ledger above E3, below A2
+      { step:'E', octave:3, freq:165, label:'E3' },
+      { step:'D', octave:3, freq:147, label:'D3' },
+      { step:'C', octave:3, freq:131, label:'C3' },
+      { step:'B', octave:2, freq:123, label:'B2' },
+      { step:'A', octave:2, freq:110, label:'A2' },
+    ],
+    3: [
+      // 3-line (G2, B2, D3): ledger above E3, below F2
+      { step:'E', octave:3, freq:165, label:'E3' },
+      { step:'D', octave:3, freq:147, label:'D3' },
+      { step:'C', octave:3, freq:131, label:'C3' },
+      { step:'B', octave:2, freq:123, label:'B2' },
+      { step:'A', octave:2, freq:110, label:'A2' },
+      { step:'G', octave:2, freq:98,  label:'G2' },
+      { step:'F', octave:2, freq:87,  label:'F2' },
+    ],
+    5: [
+      // Full bass + 2 ledger above (E4, F4) + 2 ledger below (D2, C2)
+      { step:'F', octave:4, freq:349, label:'F4' },  // 2nd ledger above
+      { step:'E', octave:4, freq:330, label:'E4' },  // space above 1st ledger
+      { step:'D', octave:4, freq:294, label:'D4' },  // 1st ledger above
+      { step:'C', octave:4, freq:262, label:'C4' },  // space just above staff
+      { step:'B', octave:3, freq:247, label:'B3' },  // line 5 (top)
+      { step:'A', octave:3, freq:220, label:'A3' },  // space 4
+      { step:'G', octave:3, freq:196, label:'G3' },  // line 4
+      { step:'F', octave:3, freq:175, label:'F3' },  // space 3
+      { step:'E', octave:3, freq:165, label:'E3' },  // line 3 (middle — D3 actually)
+      { step:'D', octave:3, freq:147, label:'D3' },  // space 2
+      { step:'C', octave:3, freq:131, label:'C3' },  // line 2
+      { step:'B', octave:2, freq:123, label:'B2' },  // space 1
+      { step:'A', octave:2, freq:110, label:'A2' },  // line 1 (bottom — G2 actually)
+      { step:'G', octave:2, freq:98,  label:'G2' },  // just below staff
+      { step:'F', octave:2, freq:87,  label:'F2' },  // 1st ledger below
+      { step:'E', octave:2, freq:82,  label:'E2' },  // space below 1st ledger
+      { step:'D', octave:2, freq:73,  label:'D2' },  // 2nd ledger below
+    ],
+  },
+};
+PITCH_SETS.none = PITCH_SETS.treble;
+
+// Alto clef (C clef, line 3): C4 is on the middle line.
+// Practical range: C3–A5. Use same pitch structure as treble but shifted down.
+// For 5-line staff we give a central range around C4.
+PITCH_SETS.alto = {
+  1: PITCH_SETS.treble[1],  // single line: same as treble
+  2: PITCH_SETS.treble[2],
+  3: PITCH_SETS.treble[3],
+  5: [
+    { step:'A', octave:5, freq:880,  label:'A5'  },
+    { step:'G', octave:5, freq:784,  label:'G5'  },
+    { step:'F', octave:5, freq:698,  label:'F5'  },
+    { step:'E', octave:5, freq:659,  label:'E5'  },
+    { step:'D', octave:5, freq:587,  label:'D5'  },
+    { step:'C', octave:5, freq:523,  label:'C5'  },
+    { step:'B', octave:4, freq:494,  label:'B4'  },
+    { step:'A', octave:4, freq:440,  label:'A4'  },
+    { step:'G', octave:4, freq:392,  label:'G4'  },
+    { step:'F', octave:4, freq:349,  label:'F4'  },
+    { step:'E', octave:4, freq:330,  label:'E4'  },
+    { step:'D', octave:4, freq:294,  label:'D4'  },
+    { step:'C', octave:4, freq:262,  label:'C4'  },
+    { step:'B', octave:3, freq:247,  label:'B3'  },
+    { step:'A', octave:3, freq:220,  label:'A3'  },
+    { step:'G', octave:3, freq:196,  label:'G3'  },
+    { step:'F', octave:3, freq:175,  label:'F3'  },
+    { step:'E', octave:3, freq:165,  label:'E3'  },
+    { step:'D', octave:3, freq:147,  label:'D3'  },
+    { step:'C', octave:3, freq:131,  label:'C3'  },
+  ],
+};
+
+// Tenor clef (C clef, line 4): C4 is on the 4th line.
+// Practical range: A2–F5.
+PITCH_SETS.tenor = {
+  1: PITCH_SETS.treble[1],
+  2: PITCH_SETS.treble[2],
+  3: PITCH_SETS.treble[3],
+  5: [
+    { step:'F', octave:5, freq:698,  label:'F5'  },
+    { step:'E', octave:5, freq:659,  label:'E5'  },
+    { step:'D', octave:5, freq:587,  label:'D5'  },
+    { step:'C', octave:5, freq:523,  label:'C5'  },
+    { step:'B', octave:4, freq:494,  label:'B4'  },
+    { step:'A', octave:4, freq:440,  label:'A4'  },
+    { step:'G', octave:4, freq:392,  label:'G4'  },
+    { step:'F', octave:4, freq:349,  label:'F4'  },
+    { step:'E', octave:4, freq:330,  label:'E4'  },
+    { step:'D', octave:4, freq:294,  label:'D4'  },
+    { step:'C', octave:4, freq:262,  label:'C4'  },
+    { step:'B', octave:3, freq:247,  label:'B3'  },
+    { step:'A', octave:3, freq:220,  label:'A3'  },
+    { step:'G', octave:3, freq:196,  label:'G3'  },
+    { step:'F', octave:3, freq:175,  label:'F3'  },
+    { step:'E', octave:3, freq:165,  label:'E3'  },
+    { step:'D', octave:3, freq:147,  label:'D3'  },
+    { step:'C', octave:3, freq:131,  label:'C3'  },
+    { step:'B', octave:2, freq:123,  label:'B2'  },
+    { step:'A', octave:2, freq:110,  label:'A2'  },
+  ],
+};
+
+// ── Beat group patterns ────────────────────────────────────────────────────────
+// Each group is an atomic unit placed into a measure.
+// `notes` = array of individual note slots within the group.
+// Each slot: xmlType, dots, isRest, beams[]
+// beams[]: { num: 1|2, type: 'begin'|'continue'|'end' }
+// Groups with multiple note slots share pitches assigned by the generator.
+const B = (num, type) => ({ num, type });
+
+const BEAT_GROUPS = [
+  // ── Simple (no beaming) ────────────────────────────────────────────────────
+  // Rule: single eighths only appear in conjunction with a rest or dotted quarter.
+  // So standalone eighth is removed from here — it lives only in mixed groups.
+  { id:'whole',       label:'Whole note',      beats:4,    cat:'simple',
+    slots:[{ xmlType:'whole',   dots:0, isRest:false, beams:[] }] },
+  { id:'half',        label:'Half note',       beats:2,    cat:'simple',
+    slots:[{ xmlType:'half',    dots:0, isRest:false, beams:[] }] },
+  { id:'quarter',     label:'Quarter note',    beats:1,    cat:'simple',
+    slots:[{ xmlType:'quarter', dots:0, isRest:false, beams:[] }] },
+
+  // ── Dotted rhythms (own submenu) ───────────────────────────────────────────
+  { id:'dottedHalf',  label:'Dotted half',              beats:3,   cat:'dotted',
+    slots:[{ xmlType:'half',    dots:1, isRest:false, beams:[] }] },
+  { id:'dottedQ',     label:'Dotted quarter (6/8 beat)', beats:1.5, cat:'dotted',
+    slots:[{ xmlType:'quarter', dots:1, isRest:false, beams:[] }] },
+  { id:'dottedQ-8',   label:'Dotted quarter + 8th',     beats:2,   cat:'dotted',
+    slots:[
+      { xmlType:'quarter', dots:1, isRest:false, beams:[] },
+      { xmlType:'eighth',  dots:0, isRest:false, beams:[] },
+    ]},
+  { id:'8-dottedQ',   label:'8th + Dotted quarter',  beats:2,   cat:'dotted',
+    slots:[
+      { xmlType:'eighth',  dots:0, isRest:false, beams:[] },
+      { xmlType:'quarter', dots:1, isRest:false, beams:[] },
+    ]},
+  { id:'dot8-16',     label:'Dotted 8th + 16th',     beats:1,   cat:'dotted',
+    slots:[
+      { xmlType:'eighth', dots:1, isRest:false, beams:[B(1,'begin')]                       },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'end'),B(2,'begin'),B(2,'end')] },
+    ]},
+  { id:'16-dot8',     label:'16th + Dotted 8th',     beats:1,   cat:'dotted',
+    slots:[
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin'),B(2,'end')] },
+      { xmlType:'eighth', dots:1, isRest:false, beams:[B(1,'end')]                            },
+    ]},
+
+  // ── Simple beamed — same subdivision ──────────────────────────────────────
+  // Rule: 4 sixteenths = downbeat only (enforced in generator)
+  // 2 sixteenths removed per spec — they only appear after/before rests (in mixed groups)
+  { id:'2x8th',       label:'2 eighths',       beats:1,    cat:'beamed-simple',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')]    },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]      },
+    ]},
+  { id:'3x8th',       label:'3 eighths (6/8)', beats:1.5,  cat:'beamed-simple',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')]    },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'continue')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]      },
+    ]},
+  { id:'4x8th',       label:'4 eighths',       beats:2,    cat:'beamed-simple',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')]    },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'continue')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'continue')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]      },
+    ]},
+  { id:'4x16th',      label:'4 sixteenths',    beats:1,    cat:'beamed-simple',
+    slots:[
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin')]       },
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'continue'),B(2,'continue')] },
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'continue'),B(2,'continue')] },
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'end'),B(2,'end')]            },
+    ]},
+  // Triplets: 3 notes in the space of 2 (time-modification 3:2)
+  { id:'triplet-8th',  label:'Eighth note triplet', beats:1, cat:'beamed-simple', triplet:true,
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')],    tripletType:'start' },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'continue')], tripletType:'mid'   },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')],      tripletType:'stop'  },
+    ]},
+  { id:'triplet-qtr',  label:'Quarter note triplet', beats:2, cat:'beamed-simple', triplet:true,
+    slots:[
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tripletType:'start' },
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tripletType:'mid'   },
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tripletType:'stop'  },
+    ]},
+
+  // ── Mixed beamed groups ────────────────────────────────────────────────────
+  // Order: eRest+8th, 8th+eRest, 2x16+8th, 8th+2x16, 16-8-16, sRest-3x16, eRest-2x16, 2x16+eRest
+  // Eighth rest + flagged eighth (no beam — flagged individually)
+  { id:'eRest-8th',    label:'8th rest + 8th note',       beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[] },
+    ]},
+  // 8th note + eighth rest (note first, rest second)
+  { id:'8th-eRest',    label:'8th note + 8th rest',       beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[] },
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[] },
+    ]},
+  { id:'2x16-8',       label:'2 sixteenths + 8th',        beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin')]    },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'continue'),B(2,'end')]   },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]                   },
+    ]},
+  { id:'8-2x16',       label:'8th + 2 sixteenths',        beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')]                 },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'continue'),B(2,'begin')] },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'end'),B(2,'end')]        },
+    ]},
+  { id:'16-8-16',      label:'16th + 8th + 16th',         beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin'),B(2,'end')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'continue')]                       },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'end'),B(2,'begin'),B(2,'end')]   },
+    ]},
+  // 16th rest + 3 beamed 16ths ("rest e & a") — fills one beat
+  { id:'sRest-3x16',   label:'16th rest + 3 sixteenths',  beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'16th', dots:0, isRest:true,  beams:[] },
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin')]       },
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'continue'),B(2,'continue')] },
+      { xmlType:'16th', dots:0, isRest:false, beams:[B(1,'end'),B(2,'end')]           },
+    ]},
+  // Eighth rest + 2 sixteenths (paired)
+  { id:'eRest-2x16',   label:'8th rest + 2 sixteenths',   beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[] },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin')] },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'end'),B(2,'end')]     },
+    ]},
+  // 2 sixteenths + eighth rest (new — notes first, rest last)
+  { id:'2x16-eRest',   label:'2 sixteenths + 8th rest',   beats:1,   cat:'beamed-mixed',
+    slots:[
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'begin'),B(2,'begin')] },
+      { xmlType:'16th',   dots:0, isRest:false, beams:[B(1,'end'),B(2,'end')]     },
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[] },
+    ]},
+
+  // ── Compound groups (6/8 only) ────────────────────────────────────────────
+  // Each compound group fills exactly one dotted-quarter beat (3 eighths = beats:1.5)
+  // or a full dotted-half measure (beats:3).
+  // Based on Finale MusicXML: divisions=4, dotted-quarter=6 units, eighth=2 units.
+  { id:'c-dottedHalf',    label:'Dotted half (full measure)',    beats:3,   cat:'compound',
+    slots:[{ xmlType:'half',    dots:1, isRest:false, beams:[] }] },
+  { id:'c-dottedQ',       label:'Dotted quarter (beat)',         beats:1.5, cat:'compound',
+    slots:[{ xmlType:'quarter', dots:1, isRest:false, beams:[] }] },
+  { id:'c-dottedQrest',   label:'Dotted quarter rest',           beats:1.5, cat:'compound',
+    slots:[{ xmlType:'quarter', dots:1, isRest:true,  beams:[] }] },
+  // 3 beamed eighths (one full dotted-quarter beat)
+  { id:'c-3x8th',         label:'3 eighths',                     beats:1.5, cat:'compound',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')]    },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'continue')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]      },
+    ]},
+  // Quarter + eighth (measure 9: "1 la li" where 1 is a quarter)
+  { id:'c-qtr-8th',       label:'Quarter + eighth',              beats:1.5, cat:'compound',
+    slots:[
+      { xmlType:'quarter', dots:0, isRest:false, beams:[] },
+      { xmlType:'eighth',  dots:0, isRest:false, beams:[] },
+    ]},
+  // Eighth + quarter (measure 10: "1 la li" where la+li = quarter)
+  { id:'c-8th-qtr',       label:'Eighth + quarter',              beats:1.5, cat:'compound',
+    slots:[
+      { xmlType:'eighth',  dots:0, isRest:false, beams:[] },
+      { xmlType:'quarter', dots:0, isRest:false, beams:[] },
+    ]},
+  // Eighth rest variants — all fill one dotted-quarter beat (3 eighth slots)
+  // "1 2 rest" = eighth eighth eighth-rest (measures: beat 1 la rest)
+  { id:'c-8-8-8r',        label:'Eighth + eighth + 8th rest',    beats:1.5, cat:'compound',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]   },
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[]             },
+    ]},
+  // "1 rest 3" = eighth eighth-rest eighth (beat 1 rest li)
+  { id:'c-8-8r-8',        label:'Eighth + 8th rest + eighth',    beats:1.5, cat:'compound',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')] },
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[]             },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]   },
+    ]},
+  // "rest 2 3" = eighth-rest eighth eighth (rest la li)
+  { id:'c-8r-8-8',        label:'8th rest + eighth + eighth',    beats:1.5, cat:'compound',
+    slots:[
+      { xmlType:'eighth', dots:0, isRest:true,  beams:[]             },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'begin')] },
+      { xmlType:'eighth', dots:0, isRest:false, beams:[B(1,'end')]   },
+    ]},
+  { id:'wRest', label:'Whole rest',   beats:4,    cat:'rest',
+    slots:[{ xmlType:'whole',   dots:0, isRest:true, beams:[] }] },
+  { id:'hRest', label:'Half rest',    beats:2,    cat:'rest',
+    slots:[{ xmlType:'half',    dots:0, isRest:true, beams:[] }] },
+  { id:'qRest', label:'Quarter rest', beats:1,    cat:'rest',
+    slots:[{ xmlType:'quarter', dots:0, isRest:true, beams:[] }] },
+  { id:'eRest', label:'Eighth rest',  beats:0.5,  cat:'rest',
+    slots:[{ xmlType:'eighth',  dots:0, isRest:true, beams:[] }] },
+  { id:'sRest', label:'16th rest',    beats:0.25, cat:'rest',
+    slots:[{ xmlType:'16th',    dots:0, isRest:true, beams:[] }] },
+];
+
+const NOTE_GROUPS  = BEAT_GROUPS.filter(g => g.cat !== 'rest');
+const REST_GROUPS  = BEAT_GROUPS.filter(g => g.cat === 'rest');
+
+// ── Tie patterns (added dynamically to pool when tiesOn) ──────────────────────
+// A tie connects two notes of the same pitch. In MusicXML:
+// first note: <tie type="start"/> + <notations><tied type="start"/></notations>
+// second note: <tie type="stop"/> + <notations><tied type="stop"/></notations>
+const TIE_GROUPS = [
+  { id:'tie-q-q',   label:'Tied quarters (= half)',  beats:2,  cat:'tied',
+    slots:[
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tieStart:true  },
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tieStop:true   },
+    ]},
+  { id:'tie-h-q',   label:'Tied half + quarter',     beats:3,  cat:'tied',
+    slots:[
+      { xmlType:'half',    dots:0, isRest:false, beams:[], tieStart:true  },
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tieStop:true   },
+    ]},
+  { id:'tie-q-h',   label:'Tied quarter + half',     beats:3,  cat:'tied',
+    slots:[
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tieStart:true  },
+      { xmlType:'half',    dots:0, isRest:false, beams:[], tieStop:true   },
+    ]},
+  { id:'tie-h-h',   label:'Tied halves (= whole)',   beats:4,  cat:'tied',
+    slots:[
+      { xmlType:'half',    dots:0, isRest:false, beams:[], tieStart:true  },
+      { xmlType:'half',    dots:0, isRest:false, beams:[], tieStop:true   },
+    ]},
+  { id:'tie-q-8',   label:'Tied quarter + eighth',   beats:1.5, cat:'tied',
+    slots:[
+      { xmlType:'quarter', dots:0, isRest:false, beams:[], tieStart:true  },
+      { xmlType:'eighth',  dots:0, isRest:false, beams:[], tieStop:true   },
+    ]},
+];
+
+// Tremolo groups — each roll is automatically tied to a following note
+// The post-roll note is a tieStop note of the same pitch, equal duration
+// This produces: [tremolo note tieStart] + [plain note tieStop]
+// ── Other options ─────────────────────────────────────────────────────────────
+const INTERVAL_OPTS = [
+  { id:'unison', label:'Unison only', max:0  },
+  { id:'2nd',    label:'Up to 2nd',   max:1  },
+  { id:'3rd',    label:'Up to 3rd',   max:2  },
+  { id:'4th',    label:'Up to 4th',   max:3  },
+  { id:'5th',    label:'Up to 5th',   max:4  },
+  { id:'any',    label:'Any interval',max:99 },
+];
+const INT_ORDER          = ['unison','2nd','3rd','4th','5th','any'];
+const STAFF_MAX_INTERVAL = { 1:'3rd', 2:'4th', 3:'any', 5:'any' };
+const TIME_SIGS = [
+  { id:'4_4', label:'4/4', num:4, denom:4 },
+  { id:'3_4', label:'3/4', num:3, denom:4 },
+  { id:'2_4', label:'2/4', num:2, denom:4 },
+  { id:'6_8', label:'6/8', num:6, denom:8 },
+];
+const STAFF_OPTS = [
+  { id:'rhythm', label:'Rhythm only' },
+  { id:1,        label:'1 line'      },
+  { id:2,        label:'2 lines'     },
+  { id:3,        label:'3 lines'     },
+  { id:5,        label:'5 lines'     },
+];
+const CLEF_OPTS = [
+  { id:'treble', label:'Treble'   },
+  { id:'alto',   label:'Alto'     },
+  { id:'tenor',  label:'Tenor'    },
+  { id:'bass',   label:'Bass'     },
+  { id:'none',   label:'No clef'  },
+];
+
+const VOICE_OPTS = [
+  { id:'marimba',   label:'Marimba'        },
+  { id:'flute',     label:'Flute'          },
+  { id:'clarinet',  label:'Clarinet'       },
+  { id:'altosax',   label:'Alto sax'       },
+  { id:'trumpet',   label:'Trumpet / Horn' },
+  { id:'trombone',  label:'Trombone'       },
+  { id:'tuba',      label:'Tuba'           },
+  { id:'strings',   label:'Strings'        },
+  { id:'snare',     label:'Snare drum'     },
+];
+
+
+// ── Key signatures & accidentals ─────────────────────────────────────────────
+const KEY_SIGS = [
+  { id:'C',  label:'C maj',   fifths:0,  tonic:'C'  },
+  { id:'F',  label:'F maj',   fifths:-1, tonic:'F'  },
+  { id:'Bb', label:'Bb maj',  fifths:-2, tonic:'B'  }, // Bb — step B, alter -1
+  { id:'Eb', label:'Eb maj',  fifths:-3, tonic:'E'  }, // Eb — step E, alter -1
+  { id:'Ab', label:'Ab maj',  fifths:-4, tonic:'A'  }, // Ab
+  { id:'Db', label:'Db maj',  fifths:-5, tonic:'D'  }, // Db
+  { id:'Gb', label:'Gb maj',  fifths:-6, tonic:'G'  }, // Gb
+  { id:'G',  label:'G maj',   fifths:1,  tonic:'G'  },
+  { id:'D',  label:'D maj',   fifths:2,  tonic:'D'  },
+  { id:'A',  label:'A maj',   fifths:3,  tonic:'A'  },
+  { id:'E',  label:'E maj',   fifths:4,  tonic:'E'  },
+  { id:'B',  label:'B maj',   fifths:5,  tonic:'B'  },
+];
+
+// Accidentals that appear next to notes (chromatic additions)
+const ACC_OPTS = [
+  { id:'none',   label:'None' },
+  { id:'sharp',  label:'#'   },
+  { id:'flat',   label:'b'   },
+  { id:'natural',label:'♮'  },
+];
+
+// Chromatic pitch tables (full 5-line treble, all 12 pitches per octave)
+// Each entry: step, alter (-1=flat, 0=nat, 1=sharp), octave, freq
+const TREBLE_CHROMATIC = [
+  { step:'G', alter:1, octave:5, freq:831,  label:'G#5/Ab5' },
+  { step:'G', alter:0, octave:5, freq:784,  label:'G5'  },
+  { step:'F', alter:1, octave:5, freq:740,  label:'F#5' },
+  { step:'F', alter:0, octave:5, freq:698,  label:'F5'  },
+  { step:'E', alter:0, octave:5, freq:659,  label:'E5'  },
+  { step:'E', alter:-1,octave:5, freq:622,  label:'Eb5' },
+  { step:'D', alter:1, octave:5, freq:587,  label:'D#5/Eb5' }, // enharmonic handled by key
+  { step:'D', alter:0, octave:5, freq:587,  label:'D5'  },
+  { step:'C', alter:1, octave:5, freq:554,  label:'C#5' },
+  { step:'C', alter:0, octave:5, freq:523,  label:'C5'  },
+  { step:'B', alter:0, octave:4, freq:494,  label:'B4'  },
+  { step:'B', alter:-1,octave:4, freq:466,  label:'Bb4' },
+  { step:'A', alter:1, octave:4, freq:466,  label:'A#4' },
+  { step:'A', alter:0, octave:4, freq:440,  label:'A4'  },
+  { step:'G', alter:1, octave:4, freq:415,  label:'G#4' },
+  { step:'G', alter:0, octave:4, freq:392,  label:'G4'  },
+  { step:'F', alter:1, octave:4, freq:370,  label:'F#4' },
+  { step:'F', alter:0, octave:4, freq:349,  label:'F4'  },
+  { step:'E', alter:0, octave:4, freq:330,  label:'E4'  },
+  { step:'E', alter:-1,octave:4, freq:311,  label:'Eb4' },
+  { step:'D', alter:1, octave:4, freq:311,  label:'D#4' },
+  { step:'D', alter:0, octave:4, freq:294,  label:'D4'  },
+];
+
+// Notes that belong to each key (as step letters that are altered by key sig)
+const KEY_SHARPS = ['F','C','G','D','A','E','B']; // order of sharps
+const KEY_FLATS  = ['B','E','A','D','G','C','F']; // order of flats
+
+let selectedKey   = 'C';
+let useAccidentals = new Set();
+// rangeHighIdx=5 → C5 in treble high array (E4,F4,G4,A4,B4,C5,...)
+// rangeLowIdx=2  → C4 in treble low array  (A3,B3,C4,D4,E4,...)
+let rangeHighIdx = 5;
+let rangeLowIdx  = 2;
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let clefId         = 'treble';
+let numLines       = 5;
+let timeSigId      = '4_4';
+let numMeasures    = 4;
+let activeNotes    = new Set(['half','quarter']);
+let activeRests    = new Set();
+let activeInterval = '2nd';
+let voiceId        = 'marimba';
+let melody         = [];
+let osmd           = null;
+let audioCtx       = null;
+let isPlaying      = false;
+let stopHandle     = null;
+let beatDotEls     = [];
+// New feature state
+let countInOn      = false;   // 2-bar count-in before playback
+let cursorOn       = false;   // highlight cursor on staff during playback
+let melodyVol      = 0.8;     // melody volume 0–1
+let clickVol       = 0.5;     // metronome click volume 0–1
+let tiesOn         = false;   // allow tied notes across barlines (kept for encode/decode compat)
+let doubleStopOn       = false;   // allow two simultaneous pitches (double stops)
+let doubleStopDensity  = 0.5;     // 0.0–1.0 probability of a double stop on any given note
+let doubleStopInterval = 3;       // steps up in pitch pool: 2nd=1, 3rd=2, 4th=3, 5th=4, 8ve=7
+let startOnTonic   = false;   // first note of exercise starts on tonic of key
+let endOnTonic     = false;   // last note of exercise resolves to tonic of key
+let rhythmOnly     = false;   // rhythm-only mode: 1 line, unison, snare, B4 range
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+function buildRadio(cid, items, name, getV, setV) {
+  const c = document.getElementById(cid); c.innerHTML = '';
+  items.forEach(item => {
+    const uid = 'r_'+cid+'_'+item.id;
+    const wrap = document.createElement('label'); wrap.className = 'radio-item';
+    const inp = document.createElement('input');
+    inp.type='radio'; inp.name=name; inp.value=String(item.id); inp.id=uid;
+    inp.checked = String(item.id) === String(getV());
+    inp.addEventListener('change', () => { if(inp.checked) setV(item.id); });
+    const lbl = document.createElement('label'); lbl.htmlFor=uid;
+    lbl.textContent = item.label !== undefined ? item.label : item.id;
+    wrap.appendChild(inp); wrap.appendChild(lbl); c.appendChild(wrap);
+  });
+}
+function buildCheck(cid, items, activeSet) {
+  const c = document.getElementById(cid); c.innerHTML = '';
+  items.forEach(item => {
+    const uid = 'c_'+cid+'_'+item.id;
+    const wrap = document.createElement('label'); wrap.className = 'check-item';
+    const inp = document.createElement('input');
+    inp.type='checkbox'; inp.id=uid; inp.checked=activeSet.has(item.id);
+    inp.addEventListener('change', () => {
+      if(inp.checked) { activeSet.add(item.id); }
+      else {
+        if(activeNotes.size + activeRests.size <= 1) { inp.checked=true; return; }
+        activeSet.delete(item.id);
+      }
+    });
+    const lbl = document.createElement('label'); lbl.htmlFor=uid; lbl.textContent=item.label;
+    wrap.appendChild(inp); wrap.appendChild(lbl); c.appendChild(wrap);
+  });
+}
+function updateIntervalOptions() {
+  const maxAllowed = STAFF_MAX_INTERVAL[numLines] || 'any';
+  const maxIdx     = INT_ORDER.indexOf(maxAllowed);
+  const c          = document.getElementById('intervalGroup');
+  let needReset    = false;
+  c.querySelectorAll('.radio-item').forEach(wrap => {
+    const inp = wrap.querySelector('input');
+    const dis = INT_ORDER.indexOf(inp.value) > maxIdx;
+    inp.disabled = dis; wrap.classList.toggle('disabled', dis);
+    if(dis && inp.checked) needReset = true;
+  });
+  if(needReset) {
+    activeInterval = maxAllowed;
+    const inp = c.querySelector('input[value="'+maxAllowed+'"]');
+    if(inp) inp.checked = true;
+  }
+}
+
+// ── Key signature UI ──────────────────────────────────────────────────────────
+function buildKeyUI() {
+  const c = document.getElementById('keyGroup');
+  c.innerHTML = '';
+
+  const cKey  = KEY_SIGS.find(k => k.id === 'C');
+  const flats = KEY_SIGS.filter(k => k.fifths < 0);  // F, Bb, Eb, Ab, Db, Gb
+  const sharps= KEY_SIGS.filter(k => k.fifths > 0);  // G, D, A, E, B
+
+  const makeBtn = (k) => {
+    const b = document.createElement('button');
+    b.style.cssText = 'font-size:12px;padding:5px 4px;border-radius:5px;border:1px solid #ccc;background:#fff;color:#444;cursor:pointer;text-align:center;width:100%;';
+    b.textContent = k.label;
+    b.dataset.key = k.id;
+    if(selectedKey === k.id) { b.style.background='#e8f0fe'; b.style.color='#1a56db'; b.style.borderColor='#93b4f5'; }
+    b.addEventListener('click', () => {
+      selectedKey = k.id;
+      document.querySelectorAll('#keyGroup button').forEach(el => {
+        el.style.background='#fff'; el.style.color='#444'; el.style.borderColor='#ccc';
+      });
+      b.style.background='#e8f0fe'; b.style.color='#1a56db'; b.style.borderColor='#93b4f5';
+      updateRangeLabels();
+    });
+    return b;
+  };
+
+  // C major spans both columns
+  const cWrap = document.createElement('div');
+  cWrap.style.cssText = 'grid-column:1/-1;';
+  cWrap.appendChild(makeBtn(cKey));
+  c.appendChild(cWrap);
+
+  // Flats (left col) paired with sharps (right col)
+  const maxRows = Math.max(flats.length, sharps.length);
+  for(let i = 0; i < maxRows; i++) {
+    const lCell = document.createElement('div');
+    const rCell = document.createElement('div');
+    if(flats[i])  lCell.appendChild(makeBtn(flats[i]));
+    if(sharps[i]) rCell.appendChild(makeBtn(sharps[i]));
+    c.appendChild(lCell);
+    c.appendChild(rCell);
+  }
+
+  const ac = document.getElementById('accidentalGroup');
+  ac.innerHTML = '';
+  // Start with 'none' selected if set is empty
+  if(useAccidentals.size === 0) useAccidentals.add('none');
+  ACC_OPTS.forEach(opt => {
+    const b = document.createElement('button');
+    b.style.cssText = 'font-size:13px;padding:4px 12px;border-radius:5px;border:1px solid #ccc;background:#fff;color:#444;cursor:pointer;';
+    b.textContent = opt.label;
+    b.dataset.acc = opt.id;
+    const isOn = useAccidentals.has(opt.id);
+    if(isOn) { b.style.background='#e8f0fe'; b.style.color='#1a56db'; b.style.borderColor='#93b4f5'; }
+    b.addEventListener('click', () => {
+      if(opt.id === 'none') {
+        // None clears all others
+        useAccidentals.clear(); useAccidentals.add('none');
+      } else {
+        useAccidentals.delete('none');
+        if(useAccidentals.has(opt.id)) { useAccidentals.delete(opt.id); }
+        else { useAccidentals.add(opt.id); }
+        if(useAccidentals.size === 0) useAccidentals.add('none');
+      }
+      // Refresh button styles
+      ac.querySelectorAll('button').forEach(btn => {
+        const on = useAccidentals.has(btn.dataset.acc);
+        btn.style.background  = on ? '#e8f0fe' : '#fff';
+        btn.style.color       = on ? '#1a56db' : '#444';
+        btn.style.borderColor = on ? '#93b4f5' : '#ccc';
+      });
+    });
+    ac.appendChild(b);
+  });
+}
+
+// ── Range slider UI ───────────────────────────────────────────────────────────
+function updateRangeLabels() {
+  const pitches = getFullPitchSet();
+  const lo = parseInt(document.getElementById('rangeLow').value);
+  const hi = parseInt(document.getElementById('rangeHigh').value);
+  const loIdx = Math.min(lo, hi);
+  const hiIdx = Math.max(lo, hi);
+  const max = pitches.length - 1;
+  document.getElementById('rangeLowLabel').textContent  = pitches[Math.min(loIdx, max)]?.label || '';
+  document.getElementById('rangeHighLabel').textContent = pitches[Math.min(hiIdx, max)]?.label || '';
+}
+
+// ── Range slider UI ───────────────────────────────────────────────────────────
+// Fixed pitch options per clef (independent of staff line count).
+// High slider: treble G4→C6, bass D3→C4
+// Low slider:  treble A4→C5, bass E3→F4
+// Sliders are independent — no cross-locking. Generator uses intersection.
+
+const RANGE_OPTS = {
+  treble: {
+    high: [
+      { label:'E4', step:'E', octave:4, freq:330  },
+      { label:'F4', step:'F', octave:4, freq:349  },
+      { label:'G4', step:'G', octave:4, freq:392  },
+      { label:'A4', step:'A', octave:4, freq:440  },
+      { label:'B4', step:'B', octave:4, freq:494  },
+      { label:'C5', step:'C', octave:5, freq:523  },
+      { label:'D5', step:'D', octave:5, freq:587  },
+      { label:'E5', step:'E', octave:5, freq:659  },
+      { label:'F5', step:'F', octave:5, freq:698  },
+      { label:'G5', step:'G', octave:5, freq:784  },
+      { label:'A5', step:'A', octave:5, freq:880  }, // 1st ledger above
+      { label:'B5', step:'B', octave:5, freq:988  },
+      { label:'C6', step:'C', octave:6, freq:1047 }, // 2nd ledger above
+    ],
+    low: [
+      { label:'A3', step:'A', octave:3, freq:220 }, // 2nd ledger below
+      { label:'B3', step:'B', octave:3, freq:247 },
+      { label:'C4', step:'C', octave:4, freq:262 }, // middle C (1st ledger below)
+      { label:'D4', step:'D', octave:4, freq:294 },
+      { label:'E4', step:'E', octave:4, freq:330 }, // bottom line of staff
+      { label:'F4', step:'F', octave:4, freq:349 },
+      { label:'G4', step:'G', octave:4, freq:392 },
+      { label:'A4', step:'A', octave:4, freq:440 },
+      { label:'B4', step:'B', octave:4, freq:494 },
+      { label:'C5', step:'C', octave:5, freq:523 },
+      { label:'D5', step:'D', octave:5, freq:587 },
+      { label:'E5', step:'E', octave:5, freq:659 },
+      { label:'F5', step:'F', octave:5, freq:698 },
+      { label:'G5', step:'G', octave:5, freq:784 },
+    ],
+  },
+  bass: {
+    high: [
+      { label:'F2', step:'F', octave:2, freq:87  }, // ledger below staff
+      { label:'G2', step:'G', octave:2, freq:98  }, // line 1
+      { label:'A2', step:'A', octave:2, freq:110 },
+      { label:'B2', step:'B', octave:2, freq:123 },
+      { label:'C3', step:'C', octave:3, freq:131 },
+      { label:'D3', step:'D', octave:3, freq:147 },
+      { label:'E3', step:'E', octave:3, freq:165 },
+      { label:'F3', step:'F', octave:3, freq:175 },
+      { label:'G3', step:'G', octave:3, freq:196 },
+      { label:'A3', step:'A', octave:3, freq:220 },
+      { label:'B3', step:'B', octave:3, freq:247 }, // line 5
+      { label:'C4', step:'C', octave:4, freq:262 }, // space above staff
+      { label:'D4', step:'D', octave:4, freq:294 }, // 1st ledger above
+      { label:'E4', step:'E', octave:4, freq:330 },
+      { label:'F4', step:'F', octave:4, freq:349 }, // 2nd ledger above
+    ],
+    low: [
+      { label:'D2', step:'D', octave:2, freq:73  }, // 2nd ledger below
+      { label:'E2', step:'E', octave:2, freq:82  },
+      { label:'F2', step:'F', octave:2, freq:87  }, // 1st ledger below
+      { label:'G2', step:'G', octave:2, freq:98  }, // line 1 (bottom)
+      { label:'A2', step:'A', octave:2, freq:110 },
+      { label:'B2', step:'B', octave:2, freq:123 },
+      { label:'C3', step:'C', octave:3, freq:131 },
+      { label:'D3', step:'D', octave:3, freq:147 },
+      { label:'E3', step:'E', octave:3, freq:165 }, // line 3 (middle)
+      { label:'F3', step:'F', octave:3, freq:175 },
+      { label:'G3', step:'G', octave:3, freq:196 },
+      { label:'A3', step:'A', octave:3, freq:220 },
+      { label:'B3', step:'B', octave:3, freq:247 }, // line 5 (top)
+    ],
+  },
+};
+// none clef uses treble ranges
+RANGE_OPTS.none   = RANGE_OPTS.treble;
+// Alto and tenor clefs use their own pitch sets; range sliders span high/low of those sets
+RANGE_OPTS.alto   = {
+  high: PITCH_SETS.alto[5].map(p=>p.label),
+  low:  [...PITCH_SETS.alto[5]].reverse().map(p=>p.label),
+};
+RANGE_OPTS.tenor  = {
+  high: PITCH_SETS.tenor[5].map(p=>p.label),
+  low:  [...PITCH_SETS.tenor[5]].reverse().map(p=>p.label),
+};
+
+
+function getRangeOpts() {
+  return RANGE_OPTS[clefId] || RANGE_OPTS.treble;
+}
+
+function updateRangeLabels() {
+  const opts  = getRangeOpts();
+  const hiEl  = document.getElementById('rangeHighLabel');
+  const loEl  = document.getElementById('rangeLowLabel');
+  const hiSlider = document.getElementById('rangeHigh');
+  const loSlider = document.getElementById('rangeLow');
+  if(!hiEl || !loEl) return;
+  const hi = opts.high[Math.min(rangeHighIdx, opts.high.length - 1)];
+  const lo = opts.low[Math.min(rangeLowIdx,  opts.low.length  - 1)];
+  if(hiEl) hiEl.textContent = hi ? hi.label : '—';
+  if(loEl) loEl.textContent = lo ? lo.label : '—';
+  if(hiSlider) { hiSlider.max = opts.high.length - 1; hiSlider.value = rangeHighIdx; }
+  if(loSlider) { loSlider.max = opts.low.length  - 1; loSlider.value = rangeLowIdx;  }
+}
+
+function buildRangeUI() {
+  const opts     = getRangeOpts();
+  const hiSlider = document.getElementById('rangeHigh');
+  const loSlider = document.getElementById('rangeLow');
+  if(!hiSlider || !loSlider) return;
+
+  // Staff-line-specific range defaults (treble clef)
+  // Indices reference RANGE_OPTS.treble.high and .low arrays
+  // high: E4(0),F4(1),G4(2),A4(3),B4(4),C5(5),D5(6),E5(7),F5(8),G5(9),A5(10),B5(11),C6(12)
+  // low:  A3(0),B3(1),C4(2),D4(3),E4(4),F4(5),G4(6),A4(7),B4(8),C5(9),D5(10),E5(11),F5(12),G5(13)
+
+  // Rhythm-only mode: pin both sliders to B4 (unison on the single line)
+  if(rhythmOnly) {
+    rangeHighIdx = Math.min(4, opts.high.length - 1); // B4 in high array
+    rangeLowIdx  = Math.min(8, opts.low.length  - 1); // B4 in low array
+    hiSlider.min = 0; hiSlider.max = opts.high.length - 1; hiSlider.value = rangeHighIdx;
+    loSlider.min = 0; loSlider.max = opts.low.length  - 1; loSlider.value = rangeLowIdx;
+    updateRangeLabels();
+    // Clone to clear listeners — rhythm only locks the range
+    const newHi = hiSlider.cloneNode(true);
+    const newLo = loSlider.cloneNode(true);
+    hiSlider.parentNode.replaceChild(newHi, hiSlider);
+    loSlider.parentNode.replaceChild(newLo, loSlider);
+    // Sliders are disabled in rhythm-only mode
+    newHi.disabled = true; newLo.disabled = true;
+    newHi.style.opacity = '0.4'; newLo.style.opacity = '0.4';
+    return;
+  }
+
+  const STAFF_RANGE_DEFAULTS = {
+    treble: {
+      1: { hi: 5, lo: 7  },  // high=C5, low=A4
+      2: { hi: 5, lo: 5  },  // high=C5, low=F4
+      3: { hi: 7, lo: 5  },  // high=E5, low=F4
+      5: { hi: opts.high.length - 1, lo: 0 }, // full range
+    },
+    bass: {
+      1: { hi: opts.high.length - 1, lo: 0 },
+      2: { hi: opts.high.length - 1, lo: 0 },
+      3: { hi: opts.high.length - 1, lo: 0 },
+      5: { hi: opts.high.length - 1, lo: 0 },
+    },
+  };
+
+  const defaults = (STAFF_RANGE_DEFAULTS[clefId] || STAFF_RANGE_DEFAULTS.treble)[numLines]
+    || { hi: opts.high.length - 1, lo: 0 };
+
+  rangeHighIdx = Math.min(defaults.hi, opts.high.length - 1);
+  rangeLowIdx  = Math.min(defaults.lo, opts.low.length  - 1);
+
+  hiSlider.min = 0; hiSlider.max = opts.high.length - 1; hiSlider.value = rangeHighIdx;
+  loSlider.min = 0; loSlider.max = opts.low.length  - 1; loSlider.value = rangeLowIdx;
+  updateRangeLabels();
+
+  // Remove old listeners by cloning
+  const newHi = hiSlider.cloneNode(true);
+  const newLo = loSlider.cloneNode(true);
+  hiSlider.parentNode.replaceChild(newHi, hiSlider);
+  loSlider.parentNode.replaceChild(newLo, loSlider);
+  newHi.disabled = false; newLo.disabled = false;
+  newHi.style.opacity = '1'; newLo.style.opacity = '1';
+
+  newHi.addEventListener('input', () => {
+    rangeHighIdx = parseInt(newHi.value);
+    updateRangeLabels();
+  });
+  newLo.addEventListener('input', () => {
+    rangeLowIdx = parseInt(newLo.value);
+    updateRangeLabels();
+  });
+}
+
+function buildAll() {
+  buildRadio('clefGroup', CLEF_OPTS, 'clef', ()=>clefId, v=>{ clefId=v; osmd=null; buildRangeUI(); });
+  buildRadio('timeSigGroup', TIME_SIGS, 'ts', ()=>timeSigId, v=>{
+    timeSigId = v;
+    buildCheck('noteCompoundGroup', NOTE_GROUPS.filter(g=>g.cat==='compound'), activeNotes);
+    apply6_8Mode();
+  });
+  buildRadio('measuresGroup',
+    [1,2,4,6,8,12,16].map(n=>({id:n,label:n+(n===1?' measure':' measures')})),
+    'meas', ()=>numMeasures, v=>{ numMeasures=parseInt(v); });
+  buildRadio('staffGroup', STAFF_OPTS, 'staff', ()=>rhythmOnly ? 'rhythm' : numLines, v=>{
+    if(v === 'rhythm') {
+      // Rhythm only: force 1 line, unison, snare drum
+      rhythmOnly    = true;
+      numLines      = 1;
+      activeInterval = 'unison';
+      voiceId       = 'snare';
+      // Rebuild interval and voice radios to reflect forced values
+      updateIntervalOptions();
+      buildRadio('intervalGroup', INTERVAL_OPTS, 'interval', ()=>activeInterval, v2=>{ activeInterval=v2; });
+      buildRadio('voiceGroup', VOICE_OPTS, 'voice', ()=>voiceId, v2=>{ voiceId=v2; });
+    } else {
+      rhythmOnly = false;
+      numLines   = parseInt(v);
+      updateIntervalOptions();
+    }
+    buildRangeUI();
+    osmd = null;
+  });
+  buildCheck('noteSimpleGroup',   NOTE_GROUPS.filter(g=>g.cat==='simple'),        activeNotes);
+  buildCheck('noteDottedGroup',   NOTE_GROUPS.filter(g=>g.cat==='dotted'),         activeNotes);
+  buildCheck('noteBeamedGroup',   NOTE_GROUPS.filter(g=>g.cat==='beamed-simple'), activeNotes);
+  buildCheck('noteMixedGroup',    NOTE_GROUPS.filter(g=>g.cat==='beamed-mixed'),  activeNotes);
+  buildCheck('noteCompoundGroup', NOTE_GROUPS.filter(g=>g.cat==='compound'),       activeNotes);
+  buildCheck('restGroup',       REST_GROUPS,                                       activeRests);
+  buildRadio('intervalGroup', INTERVAL_OPTS, 'interval', ()=>activeInterval, v=>{ activeInterval=v; });
+  buildRadio('voiceGroup', VOICE_OPTS, 'voice', ()=>voiceId, v=>{ voiceId=v; });
+  apply6_8Mode();
+}
+buildAll(); updateIntervalOptions(); buildKeyUI(); buildRangeUI();
+
+const COMPOUND_DEFAULTS = new Set(['c-dottedHalf','c-dottedQ','c-dottedQrest','c-3x8th']);
+
+function apply6_8Mode() {
+  const is6_8 = timeSigId === '6_8';
+  const lbl = document.getElementById('compoundLabel');
+  const grp = document.getElementById('noteCompoundGroup');
+  if(lbl) lbl.style.display = is6_8 ? '' : 'none';
+  if(grp) grp.style.display = is6_8 ? '' : 'none';
+
+  // If switching to 6/8, auto-open the Note Values accordion so compound section is visible
+  if(is6_8) {
+    const notesBody = document.getElementById('acc-notes');
+    const notesTrig = document.querySelector('[data-target="acc-notes"]');
+    if(notesBody && !notesBody.classList.contains('open')) {
+      notesBody.classList.add('open');
+      if(notesTrig) notesTrig.classList.add('open');
+    }
+  }
+
+  ['noteSimpleGroup','noteDottedGroup','noteBeamedGroup','noteMixedGroup'].forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.disabled = is6_8;
+      cb.parentElement.style.opacity = is6_8 ? '0.35' : '1';
+      cb.parentElement.style.pointerEvents = is6_8 ? 'none' : '';
+    });
+  });
+  const restEl = document.getElementById('restGroup');
+  if(restEl) restEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.disabled = is6_8;
+    cb.parentElement.style.opacity = is6_8 ? '0.35' : '1';
+    cb.parentElement.style.pointerEvents = is6_8 ? 'none' : '';
+  });
+  if(is6_8) {
+    // Entering 6/8: keep only compound selections, apply defaults if none
+    activeNotes = new Set([...activeNotes].filter(id =>
+      NOTE_GROUPS.find(g => g.id === id && g.cat === 'compound')
+    ));
+    if(activeNotes.size === 0) COMPOUND_DEFAULTS.forEach(id => activeNotes.add(id));
+    buildCheck('noteCompoundGroup', NOTE_GROUPS.filter(g=>g.cat==='compound'), activeNotes);
+    activeRests = new Set();
+  } else {
+    // Leaving 6/8: remove all compound notes from activeNotes
+    activeNotes = new Set([...activeNotes].filter(id =>
+      NOTE_GROUPS.find(g => g.id === id && g.cat !== 'compound')
+    ));
+    // If nothing left (was in 6/8 with only compound notes), restore duple defaults
+    if(activeNotes.size === 0) {
+      activeNotes = new Set(['half','quarter']);
+    }
+    // Rebuild all duple note group checkboxes to reflect restored state
+    buildCheck('noteSimpleGroup',   NOTE_GROUPS.filter(g=>g.cat==='simple'),        activeNotes);
+    buildCheck('noteDottedGroup',   NOTE_GROUPS.filter(g=>g.cat==='dotted'),         activeNotes);
+    buildCheck('noteBeamedGroup',   NOTE_GROUPS.filter(g=>g.cat==='beamed-simple'), activeNotes);
+    buildCheck('noteMixedGroup',    NOTE_GROUPS.filter(g=>g.cat==='beamed-mixed'),  activeNotes);
+  }
+}
+
+
+// ── Ties / tremolo / double-stop checkboxes ────────────────────────────────
+function buildSpecialGroups() {
+  buildCheck('tieGroup',     TIE_GROUPS,      new Set());
+}
+buildSpecialGroups();
+
+// Active tie group set
+let activeTies     = new Set();
+
+function buildSpecialGroupsWithSets() {
+  const tieC = document.getElementById('tieGroup'); tieC.innerHTML = '';
+  TIE_GROUPS.forEach(item => {
+    const uid = 'c_tieGroup_' + item.id;
+    const wrap = document.createElement('label'); wrap.className = 'check-item';
+    const inp = document.createElement('input');
+    inp.type='checkbox'; inp.id=uid; inp.checked=activeTies.has(item.id);
+    inp.addEventListener('change', () => {
+      if(inp.checked) activeTies.add(item.id); else activeTies.delete(item.id);
+    });
+    const lbl = document.createElement('label'); lbl.htmlFor=uid; lbl.textContent=item.label;
+    wrap.appendChild(inp); wrap.appendChild(lbl); tieC.appendChild(wrap);
+  });
+}
+buildSpecialGroupsWithSets();
+// tremoloOn removed (rolls feature pending — kept as 0 in encode/decode for backwards compat)
+document.getElementById('chkDoubleStop').addEventListener('change', function() {
+  doubleStopOn = this.checked;
+  document.getElementById('doubleStopDensityWrap').style.display = doubleStopOn ? 'block' : 'none';
+  if(doubleStopOn) buildDoubleStopIntervalGroup();
+});
+document.getElementById('doubleStopDensity').addEventListener('input', function() {
+  doubleStopDensity = parseInt(this.value) / 100;
+  document.getElementById('doubleStopDensityVal').textContent = this.value + '%';
+});
+
+// Double stop interval options — step offset in diatonic pitch pool
+const DS_INTERVAL_OPTS = [
+  { id:1, label:'2nd  (1 step)',  steps:1 },
+  { id:2, label:'3rd  (2 steps)', steps:2 },
+  { id:3, label:'4th  (3 steps)', steps:3 },
+  { id:4, label:'5th  (4 steps)', steps:4 },
+  { id:7, label:'Octave (7 steps)', steps:7 },
+];
+
+function buildDoubleStopIntervalGroup() {
+  buildRadio('doubleStopIntervalGroup', DS_INTERVAL_OPTS, 'dsInterval',
+    () => doubleStopInterval,
+    v => { doubleStopInterval = parseInt(v); }
+  );
+}
+document.getElementById('chkStartOnTonic').addEventListener('change', function() {
+  startOnTonic = this.checked;
+});
+document.getElementById('chkEndOnTonic').addEventListener('change', function() {
+  endOnTonic = this.checked;
+});
+
+// ── Count-in toggle ────────────────────────────────────────────────────────
+document.getElementById('btnCountIn').addEventListener('click', function() {
+  countInOn = !countInOn;
+  this.classList.toggle('active', countInOn);
+});
+
+// ── Cursor toggle ──────────────────────────────────────────────────────────
+document.getElementById('btnCursor').addEventListener('click', function() {
+  cursorOn = !cursorOn;
+  this.classList.toggle('active', cursorOn);
+  if(osmd) {
+    try {
+      if(cursorOn) { osmd.cursor.show(); } else { osmd.cursor.hide(); }
+    } catch(e) {}
+  }
+});
+
+// ── Volume faders ──────────────────────────────────────────────────────────
+document.getElementById('faderMelody').addEventListener('input', function() {
+  melodyVol = parseInt(this.value) / 100;
+  document.getElementById('faderMelodyVal').textContent = this.value;
+  if(melodyMasterGain) melodyMasterGain.gain.value = melodyVol;
+});
+document.getElementById('faderClick').addEventListener('input', function() {
+  clickVol = parseInt(this.value) / 100;
+  document.getElementById('faderClickVal').textContent = this.value;
+  if(clickMasterGain) clickMasterGain.gain.value = clickVol;
+});
+
+// ── Share / Save ───────────────────────────────────────────────────────────
+// ── State encoding: compact key map ──────────────────────────────────────────
+// Maps full key names to single characters to minimise URL length
+const ENC = {
+  // clef
+  clef:     'c', treble:'t', bass:'b', none:'n',
+  // lines
+  lines:    'l',
+  // time sig
+  ts:       's', '4_4':'a', '3_4':'b', '2_4':'c', '6_8':'d',
+  // measures
+  meas:     'm',
+  // interval
+  interval: 'i', unison:'u', '2nd':'2', '3rd':'3', '4th':'4', '5th':'5', any:'x',
+  // voice
+  voice:    'v', marimba:'ma', flute:'fl', clarinet:'cl', altosax:'as',
+                 trumpet:'tr', trombone:'tb', tuba:'tu', snare:'sn',
+  // key
+  key:      'k',
+  // range
+  hiIdx:    'h', loIdx:'o',
+  // booleans
+  ties:     'T', tremolo:'R', ds:'D',
+  // arrays
+  notes:    'N', rests:  'E',
+};
+// Reverse map for decoding
+const DEC = {};
+Object.entries(ENC).forEach(([long, short]) => { DEC[short] = long; });
+// Value reverse maps
+const DEC_CLEF  = { t:'treble', b:'bass', n:'none' };
+const DEC_TS    = { a:'4_4', b:'3_4', c:'2_4', d:'6_8' };
+const DEC_INT   = { u:'unison', 2:'2nd', 3:'3rd', 4:'4th', 5:'5th', x:'any' };
+const DEC_VOICE = { ma:'marimba', fl:'flute', cl:'clarinet', as:'altosax',
+                    tr:'trumpet', tb:'trombone', tu:'tuba', sn:'snare' };
+
+function encodeState() {
+  const state = {
+    c: ENC[clefId]      || clefId,
+    l: numLines,
+    s: ENC[timeSigId]   || timeSigId,
+    m: numMeasures,
+    i: ENC[activeInterval] || activeInterval,
+    v: ENC[voiceId]     || voiceId,
+    k: selectedKey,
+    h: rangeHighIdx,
+    o: rangeLowIdx,
+    T: tiesOn       ? 1 : 0,
+    R: 0,              // tremoloOn removed — reserved for future rolls feature
+    D: doubleStopOn ? 1 : 0,
+    S: startOnTonic ? 1 : 0,
+    X: endOnTonic   ? 1 : 0,
+    N: [...activeNotes].join(','),
+    E: [...activeRests].join(','),
+  };
+  const qs = Object.entries(state)
+    .filter(([, v]) => v !== '' && v !== null && v !== undefined)
+    .map(([k, v]) => k + '=' + encodeURIComponent(v))
+    .join('&');
+  // URL-safe base64: replace +→-, /→_, strip = padding so URL hash is clean
+  return btoa(qs).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeState(encoded) {
+  try {
+    // Reverse URL-safe base64: restore +, /, padding
+    const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '=='.slice(0, (4 - b64.length % 4) % 4);
+    const qs = atob(padded);
+    const obj = {};
+    qs.split('&').forEach(pair => {
+      // Use indexOf to handle values that contain '=' (avoids split truncation bug)
+      const eqIdx = pair.indexOf('=');
+      if(eqIdx < 0) return;
+      const k = pair.slice(0, eqIdx);
+      const v = decodeURIComponent(pair.slice(eqIdx + 1));
+      obj[k] = v;
+    });
+    if(obj.c) clefId        = DEC_CLEF[obj.c]  || obj.c;
+    if(obj.l) numLines       = parseInt(obj.l);
+    if(obj.s) timeSigId      = DEC_TS[obj.s]    || obj.s;
+    if(obj.m) numMeasures    = parseInt(obj.m);
+    if(obj.i) activeInterval = DEC_INT[obj.i]   || obj.i;
+    if(obj.v) voiceId        = DEC_VOICE[obj.v] || obj.v;
+    if(obj.k) selectedKey    = obj.k;
+    if(obj.h !== undefined) rangeHighIdx = parseInt(obj.h);
+    if(obj.o !== undefined) rangeLowIdx  = parseInt(obj.o);
+    tiesOn       = obj.T === '1';
+    // obj.R (tremoloOn) ignored — rolls feature removed
+    doubleStopOn = obj.D === '1';
+    startOnTonic = obj.S === '1';
+    endOnTonic   = obj.X === '1';
+    if(obj.N) activeNotes = new Set(obj.N.split(',').filter(Boolean));
+    if(obj.E) activeRests = new Set(obj.E.split(',').filter(Boolean));
+    buildAll(); updateIntervalOptions(); buildKeyUI(); buildRangeUI();
+    buildSpecialGroupsWithSets();
+  } catch(e) { console.warn('Could not decode state:', e); }
+}
+
+// ── TinyURL shortener ─────────────────────────────────────────────────────────
+// ── Share button ──────────────────────────────────────────────────────────────
+// Share button — calls TinyURL API via corsproxy.io to bypass CORS restrictions
+const TINYURL_KEY = 'dZ7RXi8cxWR8DcyajhuRfVtQsIYXN1Xh6rYWuZbmZkvwGAGmLsBBk1BdGTMJ';
+
+document.getElementById('btnShare').addEventListener('click', async function() {
+  const bar = document.getElementById('shareBar');
+  const inp = document.getElementById('shareInput');
+  const btn = document.getElementById('shareCopy');
+
+  // Toggle — hide if already visible
+  if(bar.style.display === 'flex') {
+    bar.style.display = 'none'; return;
+  }
+
+  // Build the full URL synchronously
+  const encoded = encodeState();
+  const base    = window.location.href.split('#')[0];
+  const longUrl = base + '#' + encoded;
+
+  // Show bar immediately — Copy always works as fallback
+  inp.value       = longUrl;
+  btn.textContent = 'Copy';
+  btn.disabled    = false;
+  bar.style.display = 'flex';
+
+  // Try to shorten — corsproxy.io forwards the request with CORS headers
+  inp.value    = 'Shortening…';
+  btn.disabled = true;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch('https://corsproxy.io/?https://api.tinyurl.com/create', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': 'Bearer ' + TINYURL_KEY,
+      },
+      body:   JSON.stringify({ url: longUrl, domain: 'tinyurl.com' }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if(res.ok) {
+      const data = await res.json();
+      inp.value = data?.data?.tiny_url || longUrl;
+    } else {
+      inp.value = longUrl;
+    }
+  } catch(e) {
+    inp.value = longUrl;
+  }
+  btn.disabled = false;
+});
+
+document.getElementById('shareCopy').addEventListener('click', function() {
+  const inp = document.getElementById('shareInput');
+  inp.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  try { navigator.clipboard.writeText(inp.value); } catch(e) {}
+  this.textContent = 'Copied!';
+  setTimeout(() => { this.textContent = 'Copy'; }, 2000);
+});
+
+// ── Restore state from URL hash on load ──────────────────────────────────────
+function restoreFromHash() {
+  try {
+    const hash = window.location.hash.slice(1);
+    if(!hash) return;
+    // Support both new compact (base64) and legacy JSON format
+    if(hash.startsWith('%7B') || hash.startsWith('{')) {
+      // Legacy JSON format
+      const state = JSON.parse(decodeURIComponent(hash));
+      if(state.clef)     clefId         = state.clef;
+      if(state.lines)    numLines        = state.lines;
+      if(state.ts)       timeSigId       = state.ts;
+      if(state.meas)     numMeasures     = state.meas;
+      if(state.notes)    activeNotes     = new Set(state.notes);
+      if(state.rests)    activeRests     = new Set(state.rests);
+      if(state.interval) activeInterval  = state.interval;
+      if(state.voice)    voiceId         = state.voice;
+      if(state.key)      selectedKey     = state.key;
+      if(state.hiIdx !== undefined) rangeHighIdx = state.hiIdx;
+      if(state.loIdx !== undefined) rangeLowIdx  = state.loIdx;
+      tiesOn       = !!state.ties;
+      // state.tremolo (tremoloOn) ignored — rolls feature removed
+      doubleStopOn = !!state.ds;
+      buildAll(); updateIntervalOptions(); buildKeyUI(); buildRangeUI();
+      buildSpecialGroupsWithSets();
+    } else {
+      // New compact base64 format
+      decodeState(hash);
+    }
+  } catch(e) { console.warn('Could not restore state from URL'); }
+}
+
+document.getElementById('tempo').addEventListener('input', e => {
+  document.getElementById('tempoVal').textContent = e.target.value;
+});
+let sidebarOpen = true;
+
+function isMobile() { return window.innerWidth <= 768; }
+
+function openSidebar() {
+  sidebarOpen = true;
+  const sb  = document.getElementById('sidebar');
+  const bd  = document.getElementById('sidebarBackdrop');
+  const chv = document.getElementById('sidebarCollapseChevron');
+  if(isMobile()) {
+    sb.classList.add('mobile-open'); sb.classList.remove('collapsed');
+    if(bd) bd.style.display = 'block';
+  } else {
+    sb.classList.remove('collapsed');
+  }
+  if(chv) chv.style.transform = 'rotate(0deg)';
+  document.getElementById('btnSettings').classList.add('active');
+}
+
+function closeSidebar() {
+  sidebarOpen = false;
+  const sb  = document.getElementById('sidebar');
+  const bd  = document.getElementById('sidebarBackdrop');
+  const chv = document.getElementById('sidebarCollapseChevron');
+  if(isMobile()) {
+    sb.classList.remove('mobile-open');
+    if(bd) bd.style.display = 'none';
+  } else {
+    sb.classList.add('collapsed');
+  }
+  if(chv) chv.style.transform = 'rotate(180deg)';
+  document.getElementById('btnSettings').classList.remove('active');
+}
+
+document.getElementById('btnSettings').addEventListener('click', () => {
+  sidebarOpen ? closeSidebar() : openSidebar();
+});
+
+// Clicking the sidebar header itself also collapses (desktop only)
+document.getElementById('sidebarHeaderCollapse').addEventListener('click', function(e) {
+  if(e.target.id === 'btnSidebarClose') return; // handled separately
+  if(!isMobile()) { sidebarOpen ? closeSidebar() : openSidebar(); }
+});
+
+// Close button (mobile only — visible via CSS)
+document.getElementById('btnSidebarClose').addEventListener('click', closeSidebar);
+
+// Backdrop tap closes sidebar on mobile
+document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebar);
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getTimeSig() { return TIME_SIGS.find(t=>t.id===timeSigId) || TIME_SIGS[0]; }
+function getTempo()   { return parseInt(document.getElementById('tempo').value); }
+function getMaxInt()  { return (INTERVAL_OPTS.find(o=>o.id===activeInterval)||{max:99}).max; }
+
+// Returns the FULL pitch array for current clef/lines (diatonic only, no range filter)
+function getFullPitchSet() {
+  return (PITCH_SETS[clefId]||PITCH_SETS.treble)[numLines] || [];
+}
+
+// Returns pitches filtered by range slider and adjusted for the current key signature
+function getPitches() {
+  const full = getFullPitchSet();
+  const opts = getRangeOpts();
+  const hiPitch = opts.high[Math.min(rangeHighIdx, opts.high.length - 1)];
+  const loPitch = opts.low[Math.min(rangeLowIdx,  opts.low.length  - 1)];
+
+  if(!hiPitch || !loPitch) return applyKeyToPitches(full);
+
+  const hiFreq = Math.max(hiPitch.freq, loPitch.freq);
+  const loFreq = Math.min(hiPitch.freq, loPitch.freq);
+
+  let filtered = full.filter(p => p.freq >= loFreq && p.freq <= hiFreq);
+  if(!filtered.length) filtered = full;
+
+  // Apply key signature — replace natural pitches with key-correct versions
+  filtered = applyKeyToPitches(filtered);
+
+  // If accidentals enabled, mix in chromatic pitches within range
+  if(!useAccidentals.has('none') && useAccidentals.size > 0 && numLines === 5) {
+    const keySig = KEY_SIGS.find(k => k.id === selectedKey) || KEY_SIGS[0];
+    const extra  = [];
+    TREBLE_CHROMATIC.forEach(p => {
+      if(p.alter === 0) return;
+      const inRange = p.freq >= loFreq && p.freq <= hiFreq;
+      if(!inRange) return;
+      if(p.alter === 1  && useAccidentals.has('sharp')) extra.push(p);
+      if(p.alter === -1 && useAccidentals.has('flat'))  extra.push(p);
+    });
+    filtered = [...filtered, ...extra].sort((a,b) => b.freq - a.freq);
+    const seen = new Set();
+    filtered = filtered.filter(p => {
+      const k = Math.round(p.freq);
+      if(seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  }
+
+  return filtered;
+}
+
+// Adjust a pitch array so every note matches the current key signature.
+// e.g. in F major (one flat), every B natural becomes Bb.
+// The note's step stays the same; alter and freq are updated.
+const FREQ_TABLE = {
+  'C':  [130.8, 261.6, 523.3, 1046.5],
+  'D':  [146.8, 293.7, 587.3, 1174.7],
+  'E':  [164.8, 329.6, 659.3, 1318.5],
+  'F':  [174.6, 349.2, 698.5, 1396.9],
+  'G':  [196.0, 392.0, 784.0, 1568.0],
+  'A':  [220.0, 440.0, 880.0, 1760.0],
+  'B':  [246.9, 493.9, 987.8, 1975.5],
+};
+const SEMITONE = Math.pow(2, 1/12);
+
+function freqForPitch(step, alter, octave) {
+  const base = FREQ_TABLE[step];
+  if(!base) return 440;
+  // Find the base freq for this octave (C4 = 261.6, etc.)
+  // octave index: C4 is index 1 in our table (C3=0, C4=1, C5=2, C6=3)
+  const octIdx = Math.max(0, Math.min(3, octave - 3));
+  return Math.round(base[octIdx] * Math.pow(SEMITONE, alter || 0));
+}
+
+function applyKeyToPitches(pitches) {
+  const keySig    = KEY_SIGS.find(k => k.id === selectedKey) || { fifths: 0 };
+  const alteredBy = getAlteredSteps(keySig.fifths); // e.g. { B: -1 } for F major
+
+  return pitches.map(p => {
+    const keyAlter = alteredBy[p.step] || 0;
+    const curAlter = p.alter || 0;
+    if(keyAlter === curAlter) return p; // already correct
+    // Replace with key-correct version
+    const newFreq = freqForPitch(p.step, keyAlter, p.octave);
+    const alterLabel = keyAlter === 1 ? '#' : keyAlter === -1 ? 'b' : '';
+    return {
+      ...p,
+      alter: keyAlter,
+      freq:  newFreq,
+      label: p.step + alterLabel + p.octave,
+    };
+  });
+}
+
+// Returns a map of step → alter for the given key (fifths count)
+function getAlteredSteps(fifths) {
+  const map = {};
+  if(fifths > 0) KEY_SHARPS.slice(0, fifths).forEach(s => { map[s] = 1; });
+  if(fifths < 0) KEY_FLATS.slice(0, -fifths).forEach(s => { map[s] = -1; });
+  return map;
+}
+
+
+// ── Generation ────────────────────────────────────────────────────────────────
+// A "measure" is an array of placed groups.
+// Each placed group = { group, pitches[] } where pitches[] has one entry per slot.
+function generateMeasure(beatsPerMeasure, prevPitchIdx, allPitches, forcedFirstIdx) {
+  const basePool = [
+    ...NOTE_GROUPS.filter(g => activeNotes.has(g.id) && g.beats <= beatsPerMeasure + 0.001),
+    ...REST_GROUPS.filter(g => activeRests.has(g.id) && g.beats <= beatsPerMeasure + 0.001),
+    // Ties: active when any tie pattern is checked
+    ...(activeTies.size > 0     ? TIE_GROUPS.filter(g => activeTies.has(g.id) && g.beats <= beatsPerMeasure + 0.001) : []),
+  ];
+  if(!basePool.length) basePool.push(BEAT_GROUPS.find(g=>g.id==='quarter'));
+
+  const maxInt = getMaxInt();
+  const out    = [];
+  let rem      = beatsPerMeasure;
+  let beatPos  = 0;   // tracks beat position within measure (0 = beat 1, 1 = beat 2, etc.)
+  let curIdx   = prevPitchIdx !== null ? prevPitchIdx : Math.floor(allPitches.length / 2);
+  let tries    = 0;
+
+  while(rem > 0.001 && tries++ < 200) {
+    // On an upbeat (beatPos is not a whole number), apply placement rules:
+    // - No quarter rests
+    // - No dotted-eighth + sixteenth
+    // - No 4x16th (4 sixteenths only on downbeat)
+    // - No 2x8th / 4x8th on upbeats (eighth beams start on beats)
+    // - No eRest-4x16 (starts with rest + 4 sixteenths, too complex off-beat)
+    // 16th rest (sRest) may only appear when 16th-note or 8th-note groups are active
+    const has16thContext = activeNotes.has('4x16th') || activeNotes.has('sRest-3x16') ||
+                           activeNotes.has('eRest-2x16') || activeNotes.has('2x8th') ||
+                           activeNotes.has('3x8th') || activeNotes.has('4x8th') ||
+                           activeNotes.has('eRest-8th') || activeNotes.has('8th-eRest') ||
+                           activeNotes.has('8-2x16') || activeNotes.has('2x16-8') ||
+                           activeNotes.has('16-8-16') || activeNotes.has('dot8-16') ||
+                           activeNotes.has('16-dot8') || activeNotes.has('2x16-eRest');
+
+    // In 6/8 time, beats fall on dotted-quarter positions (every 1.5 beats).
+    // All other time signatures use whole-number beat positions.
+    const ts       = getTimeSig();
+    const is6_8    = ts.id === '6_8';
+    const beatUnit = is6_8 ? 1.5 : 1;
+    const isDownbeat = Math.abs((beatPos / beatUnit) - Math.round(beatPos / beatUnit)) < 0.001;
+
+    // These groups only allowed on a beat position (downbeat in their respective metre)
+    const DOWNBEAT_ONLY = new Set(['qRest','dot8-16','4x16th','4x8th','3x8th']);
+    const pool = basePool.filter(g => {
+      if(!isDownbeat && DOWNBEAT_ONLY.has(g.id)) return false;
+      if(g.id === 'sRest' && !has16thContext) return false;
+      return g.beats <= rem + 0.001;
+    });
+    if(!pool.length) break;
+
+    const group = pool[Math.floor(Math.random() * pool.length)];
+
+    // Rule: eighth notes on an upbeat must be individually flagged (no beam).
+    // Exception: 3x8th is always a downbeat group in 6/8 — already guarded above.
+    const isEighthGroup = group.slots.every(s => s.xmlType === 'eighth' || s.isRest);
+    const hasEighthBeams = group.slots.some(s => s.xmlType === 'eighth' && s.beams.length > 0);
+    let activeGroup = group;
+    if(!isDownbeat && isEighthGroup && hasEighthBeams && group.id !== '3x8th') {
+      activeGroup = {
+        ...group,
+        slots: group.slots.map(s => ({ ...s, beams: [] }))
+      };
+    }
+
+    // Assign a pitch to each non-rest slot, applying interval constraint
+    // Ties: tieStop slots use the SAME pitch as the tieStart slot
+    // Double stops: each slot gets a second pitch at an interval away
+    let tieStartPitch   = null;
+    let firstPitchDone  = false; // tracks whether we've placed the first pitched note yet
+    const assignedPitches = activeGroup.slots.map(slot => {
+      if(slot.isRest) return null;
+      // Tied stop note must match the tie start note
+      if(slot.tieStop && tieStartPitch) {
+        return { pitchIdx: tieStartPitch.pitchIdx, pitch: tieStartPitch.pitch, pitch2: null };
+      }
+      let idx;
+      // If this is the very first pitched slot and we have a forced tonic index, use it exactly
+      if(!firstPitchDone && forcedFirstIdx !== undefined && forcedFirstIdx !== null) {
+        idx = forcedFirstIdx;
+      } else {
+        const lo = Math.max(0, curIdx - maxInt);
+        const hi = Math.min(allPitches.length - 1, curIdx + maxInt);
+        idx = lo + Math.floor(Math.random() * (hi - lo + 1));
+      }
+      firstPitchDone = true;
+      curIdx = idx;
+      // Double stop: add second pitch based on density probability and chosen interval
+      // doubleStopInterval = diatonic steps; pool sorted highest→lowest so subtract to go up
+      let pitch2 = null;
+      if(doubleStopOn && !slot.tieStop && Math.random() < doubleStopDensity) {
+        const idx2 = Math.max(0, idx - doubleStopInterval);
+        if(idx2 !== idx) pitch2 = allPitches[idx2];
+      }
+      const result = { pitchIdx: idx, pitch: allPitches[idx], pitch2 };
+      if(slot.tieStart) tieStartPitch = result;
+      return result;
+    });
+
+    out.push({ group: activeGroup, assignedPitches });
+    rem     -= activeGroup.beats;
+    beatPos += activeGroup.beats;
+  }
+  return { placedGroups: out, lastPitchIdx: curIdx };
+}
+
+function generate() {
+  stopPlayback(); hideError();
+  const ts              = getTimeSig();
+  const allPitches      = getPitches();
+  const beatsPerMeasure = ts.num * (ts.denom === 8 ? 0.5 : 1);
+  melody = [];
+  let lastIdx  = null;
+  let tonicIdx = null;
+
+  // If "Start on tonic" is enabled, find the tonic pitch in the active pool
+  // and pin the very first note to it exactly
+  if(startOnTonic) {
+    const keySig = KEY_SIGS.find(k => k.id === selectedKey);
+    if(keySig) {
+      const mid = Math.floor(allPitches.length / 2);
+      const tonicMatches = allPitches
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.step === keySig.tonic);
+      if(tonicMatches.length > 0) {
+        tonicMatches.sort((a, b) => Math.abs(a.i - mid) - Math.abs(b.i - mid));
+        tonicIdx = tonicMatches[0].i;
+        lastIdx  = tonicIdx; // also seed curIdx so subsequent notes flow from tonic
+      }
+    }
+  }
+
+  for(let m = 0; m < numMeasures; m++) {
+    // Only force tonic on the very first measure's first note
+    const r = generateMeasure(beatsPerMeasure, lastIdx, allPitches, m === 0 ? tonicIdx : null);
+    melody.push(r.placedGroups);
+    lastIdx = r.lastPitchIdx;
+  }
+
+  // ── End on tonic: post-generation pass ───────────────────────────────────
+  // Find the last pitched (non-rest, non-tieStop) slot in the final measure
+  // and replace its pitch with the nearest tonic in the pool.
+  if(endOnTonic) {
+    const keySig = KEY_SIGS.find(k => k.id === selectedKey);
+    if(keySig && allPitches.length > 0) {
+      // Find all tonic pitches in the pool
+      const tonicPitches = allPitches
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p.step === keySig.tonic);
+
+      if(tonicPitches.length > 0) {
+        // Walk backwards through measures and groups to find last pitched slot
+        let found = false;
+        for(let mi = melody.length - 1; mi >= 0 && !found; mi--) {
+          const measure = melody[mi];
+          for(let gi = measure.length - 1; gi >= 0 && !found; gi--) {
+            const { group, assignedPitches } = measure[gi];
+            for(let si = group.slots.length - 1; si >= 0 && !found; si--) {
+              const slot = group.slots[si];
+              // Skip rests and tieStop slots (tieStop pitch is locked to tieStart)
+              if(slot.isRest || slot.tieStop) continue;
+
+              // Found the last pitched slot — pick nearest tonic to current pitch
+              const curPitchIdx = assignedPitches[si] ? assignedPitches[si].pitchIdx : 0;
+              tonicPitches.sort((a, b) =>
+                Math.abs(a.i - curPitchIdx) - Math.abs(b.i - curPitchIdx)
+              );
+              const best = tonicPitches[0];
+
+              // Replace the pitch in-place
+              assignedPitches[si] = {
+                pitchIdx: best.i,
+                pitch:    best.p,
+                pitch2:   assignedPitches[si] ? assignedPitches[si].pitch2 : null,
+              };
+              found = true;
+            }
+          }
+        }
+      }
+    }
+  }
+  renderOSMD(); setupDots();
+  document.getElementById('info').textContent =
+    numMeasures + ' measure' + (numMeasures>1?'s':'') +
+    ' · ' + ts.num + '/' + ts.denom +
+    ' · ' + getTempo() + ' BPM' +
+    ' · ' + numLines + '-line ' + clefId + ' staff';
+}
+
+// ── MusicXML builder ──────────────────────────────────────────────────────────
+function buildMusicXML() {
+  const ts        = getTimeSig();
+  const divisions = 4;
+  const durMap    = { whole:16, half:8, quarter:4, eighth:2, '16th':1 };
+
+  // For no-clef we still use treble geometry — clef suppression is handled by OSMD option
+  let clefInner = '';
+  if(clefId === 'treble' || clefId === 'none') {
+    clefInner = '<sign>G</sign><line>2</line>';
+  } else if(clefId === 'alto') {
+    clefInner = '<sign>C</sign><line>3</line>';
+  } else if(clefId === 'tenor') {
+    clefInner = '<sign>C</sign><line>4</line>';
+  } else if(clefId === 'bass') {
+    clefInner = '<sign>F</sign><line>4</line>';
+  }
+  const clefTag = `<clef>${clefInner}</clef>`;
+
+  // Build a set of steps that are already altered by the key signature
+  // so we know NOT to write an <accidental> tag for those notes
+  const keySig   = KEY_SIGS.find(k => k.id === selectedKey) || { fifths: 0 };
+  const alteredByKey = getAlteredSteps(keySig.fifths); // { 'B': -1, 'E': -1, ... } for Bb key etc.
+
+  const midPitchIdx = Math.floor(getPitches().length / 2);
+
+  let measuresXml = '';
+  melody.forEach((placedGroups, mi) => {
+    let notesXml = '';
+
+    placedGroups.forEach(({ group, assignedPitches }) => {
+      group.slots.forEach((slot, si) => {
+        const baseDur = durMap[slot.xmlType] || 4;
+        const durDotted = slot.dots ? Math.round(baseDur * 1.5) : baseDur;
+        // Triplets occupy 2/3 of their notated duration in MusicXML
+        const dur     = slot.tripletType ? Math.round(durDotted * 2 / 3) : durDotted;
+        const dotTag  = slot.dots ? '<dot/>' : '';
+        const beamTags = slot.beams
+          .map(b => `<beam number="${b.num}">${b.type}</beam>`)
+          .join('');
+
+        if(slot.isRest) {
+          const restTimeMod = slot.tripletType
+            ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>'
+            : '';
+          const restTupletEl = slot.tripletType === 'start' ? '<tuplet type="start" bracket="yes"/>'
+                             : slot.tripletType === 'stop'  ? '<tuplet type="stop"/>' : '';
+          const restNotBlock = restTupletEl ? `<notations>${restTupletEl}</notations>` : '';
+          notesXml += `<note><rest/><duration>${dur}</duration><voice>1</voice><type>${slot.xmlType}</type>${dotTag}${restTimeMod}${restNotBlock}</note>`;
+        } else {
+          const ap   = assignedPitches[si];
+          const p    = ap ? ap.pitch : { step:'B', octave:4, alter:0 };
+          const idx  = ap ? ap.pitchIdx : midPitchIdx;
+          // Stem direction: up when pitch is below middle of pool.
+          // Special rule: 1-line staff + unison OR rhythm-only mode → always stem up.
+          const forceUp = rhythmOnly || (numLines === 1 && activeInterval === 'unison');
+          const stem = forceUp ? 'up' : (idx <= midPitchIdx ? 'down' : 'up');
+
+          const hasAlter = ap && ap.pitch.alter && ap.pitch.alter !== 0;
+          const alterTag = hasAlter ? `<alter>${ap.pitch.alter}</alter>` : '';
+
+          let accTag = '';
+          if(!useAccidentals.has('none') && hasAlter) {
+            const keyAlter = alteredByKey[p.step] || 0;
+            if(ap.pitch.alter !== keyAlter) {
+              accTag = `<accidental>${ap.pitch.alter === 1 ? 'sharp' : 'flat'}</accidental>`;
+            }
+          }
+
+          // Tie tags
+          const tieTagNote  = slot.tieStart ? '<tie type="start"/>'
+                            : slot.tieStop  ? '<tie type="stop"/>'  : '';
+          const tiedEl  = slot.tieStart ? '<tied type="start"/>'
+                        : slot.tieStop  ? '<tied type="stop"/>'  : '';
+          const tremEl  = slot.tremolo  ? `<ornaments><tremolo type="single">${slot.tremolo}</tremolo></ornaments>` : '';
+
+          // Triplet: time-modification (3 in space of 2) + tuplet bracket notations
+          const timeMod = slot.tripletType
+            ? '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>'
+            : '';
+          const tupletEl = slot.tripletType === 'start' ? '<tuplet type="start" bracket="yes"/>'
+                         : slot.tripletType === 'stop'  ? '<tuplet type="stop"/>'
+                         : '';
+
+          // Combine all notation elements
+          const notElems = [tiedEl, tremEl, tupletEl].filter(Boolean).join('');
+          const notBlock = notElems ? `<notations>${notElems}</notations>` : '';
+
+          const noteXml = `<note><pitch><step>${p.step}</step>${alterTag}<octave>${p.octave}</octave></pitch><duration>${dur}</duration><voice>1</voice><type>${slot.xmlType}</type>${dotTag}${timeMod}<stem>${stem}</stem>${tieTagNote}${accTag}${beamTags}${notBlock}</note>`;
+          notesXml += noteXml;
+
+          // Double stop — add chord note immediately after
+          if(ap && ap.pitch2 && !slot.isRest) {
+            const p2 = ap.pitch2;
+            const a2Tag = (p2.alter && p2.alter !== 0) ? `<alter>${p2.alter}</alter>` : '';
+            notesXml += `<note><chord/><pitch><step>${p2.step}</step>${a2Tag}<octave>${p2.octave}</octave></pitch><duration>${dur}</duration><voice>1</voice><type>${slot.xmlType}</type>${dotTag}<stem>${stem}</stem></note>`;
+          }
+        }
+      });
+    });
+
+    // Insert a system break at the start of measures 5, 9, 13 (every 4th measure)
+    // so exercises with 6, 8, 12, or 16 measures display as 4-measure lines.
+    // Never break at measure 1 (mi===0).
+    const systemBreak = (mi > 0 && mi % 4 === 0)
+      ? '<print new-system="yes"/>'
+      : '';
+
+    const attrib = mi === 0 ? `<attributes>
+      <divisions>${divisions}</divisions>
+      <key><fifths>${keySig.fifths}</fifths><mode>major</mode></key>
+      <time><beats>${ts.num}</beats><beat-type>${ts.denom}</beat-type></time>
+      ${clefTag}
+      <staff-details><staff-lines>${numLines}</staff-lines></staff-details>
+    </attributes>
+    <sound tempo="${getTempo()}"/>` : '';
+
+    measuresXml += `<measure number="${mi+1}">${systemBreak}${attrib}${notesXml}</measure>`;
+  });
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Music</part-name></score-part></part-list>
+  <part id="P1">${measuresXml}</part>
+</score-partwise>`;
+}
+
+// ── OSMD render ───────────────────────────────────────────────────────────────
+async function renderOSMD() {
+  const container = document.getElementById('osmd-container');
+  try {
+    if(osmd) {
+      try { container.innerHTML = ''; } catch(e) {}
+      osmd = null;
+    }
+    osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(container, {
+      autoResize: true, backend: 'svg',
+      drawTitle: false, drawSubtitle: false, drawComposer: false,
+      drawLyricist: false, drawCredits: false, drawPartNames: false,
+      drawMeasureNumbers: true,
+      measureNumberInterval: 1,
+      followCursor: false,
+      drawClefs: clefId !== 'none',
+      drawKeySignatures: true,
+      drawTimeSignatures: true,
+    });
+
+    await osmd.load(buildMusicXML());
+    // Enable system breaks from MusicXML print elements
+    try { osmd.EngravingRules.NewSystemAtXMLNewSystemElement = true; } catch(e) {}
+    osmd.render();
+
+    // No-clef: post-process SVG to hide clef symbols
+    // OSMD renders clefs as <g> elements with class containing 'Clef'
+    if(clefId === 'none') {
+      setTimeout(() => {
+        const container2 = document.getElementById('osmd-container');
+        if(!container2) return;
+        // VexFlow/OSMD marks clef groups with data-id or class patterns
+        // Hide any SVG group whose bounding box is in the far-left clef region
+        const svg = container2.querySelector('svg');
+        if(!svg) return;
+        // OSMD wraps clefs in <g> elements — find by looking for the clef path shapes
+        // The most reliable: hide elements with class names containing 'clef' (case-insensitive)
+        svg.querySelectorAll('[class*="Clef"], [class*="clef"]').forEach(el => {
+          el.style.display = 'none';
+        });
+        // Also try: any <g> that only contains a path in the leftmost ~40px of each system
+        svg.querySelectorAll('g').forEach(g => {
+          const rect = g.getBoundingClientRect();
+          const svgRect = svg.getBoundingClientRect();
+          const relX = rect.left - svgRect.left;
+          // Clef symbols are always in the first ~50px of a system and are tall
+          if(relX < 55 && rect.height > 20 && rect.width < 40 && rect.width > 5) {
+            // Check it's not a barline (barlines are very narrow)
+            if(rect.width > 8) g.style.display = 'none';
+          }
+        });
+      }, 80);
+    }
+
+    setTimeout(applyZoom, 50);
+  } catch(err) {
+    showError('Render error: ' + err.message);
+    console.error('OSMD error:', err);
+  }
+}
+
+// Beat row removed — no-op stubs
+function setupDots() { beatDotEls = []; }
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+// Persistent master gain nodes — live for the full duration of playback so
+// the volume sliders can adjust them in real time.
+let melodyMasterGain = null;
+let clickMasterGain  = null;
+let secPerBeatGlobal = 0.5; // updated at playback start, used by roll synthesis
+
+function getAC() {
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function getMelodyGain() {
+  const ctx = getAC();
+  if(!melodyMasterGain || melodyMasterGain.context !== ctx) {
+    melodyMasterGain = ctx.createGain();
+    melodyMasterGain.gain.value = melodyVol;
+    melodyMasterGain.connect(ctx.destination);
+  }
+  return melodyMasterGain;
+}
+
+function getClickGain() {
+  const ctx = getAC();
+  if(!clickMasterGain || clickMasterGain.context !== ctx) {
+    clickMasterGain = ctx.createGain();
+    clickMasterGain.gain.value = clickVol;
+    clickMasterGain.connect(ctx.destination);
+  }
+  return clickMasterGain;
+}
+
+// Duration in seconds for each xmlType at the current tempo
+function xmlTypeSecs(xmlType, dots, secPerBeat) {
+  const beatMap = { whole:4, half:2, quarter:1, eighth:0.5, '16th':0.25 };
+  const base    = (beatMap[xmlType] || 1) * secPerBeat;
+  return dots ? base * 1.5 : base;
+}
+
+// ── Instrument voice synthesis ────────────────────────────────────────────────
+// Each instrument is modelled by:
+//   harmonics : array of { ratio, gain } — partial frequencies relative to fundamental
+//   attack    : seconds to reach peak amplitude
+//   decay     : seconds of initial decay (for plucked/struck instruments)
+//   sustain   : gain level after decay phase (0 = fully decayed, 1 = organ-like)
+//   release   : seconds to fade after note ends
+//   waveform  : base oscillator type (modified by harmonics)
+//   vibrato   : { rate, depth } — optional pitch modulation
+//   noise     : 0–1 amount of breathiness (flute, clarinet)
+
+const INSTRUMENTS = {
+  marimba: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:4,    gain:0.2  },  // marimba has strong 4th harmonic
+      { ratio:10,   gain:0.05 },
+    ],
+    attack:0.008, decay:0.35, sustain:0.0, release:0.05,
+    noise:0,
+  },
+  flute: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:2,    gain:0.3  },
+      { ratio:3,    gain:0.1  },
+    ],
+    attack:0.08, decay:0, sustain:1.0, release:0.12,
+    noise:0.06,
+    vibrato: { rate:5.5, depth:0.012 },
+  },
+  clarinet: {
+    // Clarinet suppresses even harmonics (cylindrical bore)
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:3,    gain:0.75 },
+      { ratio:5,    gain:0.5  },
+      { ratio:7,    gain:0.25 },
+      { ratio:9,    gain:0.1  },
+    ],
+    attack:0.04, decay:0, sustain:1.0, release:0.1,
+    noise:0.03,
+  },
+  altosax: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:2,    gain:0.8  },
+      { ratio:3,    gain:0.5  },
+      { ratio:4,    gain:0.3  },
+      { ratio:5,    gain:0.15 },
+      { ratio:6,    gain:0.07 },
+    ],
+    attack:0.03, decay:0, sustain:1.0, release:0.1,
+    noise:0.04,
+    vibrato: { rate:5.0, depth:0.008 },
+  },
+  trumpet: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:2,    gain:0.9  },
+      { ratio:3,    gain:0.7  },
+      { ratio:4,    gain:0.5  },
+      { ratio:5,    gain:0.3  },
+      { ratio:6,    gain:0.15 },
+      { ratio:7,    gain:0.07 },
+    ],
+    attack:0.025, decay:0, sustain:1.0, release:0.08,
+    noise:0.01,
+  },
+  trombone: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:2,    gain:0.7  },
+      { ratio:3,    gain:0.5  },
+      { ratio:4,    gain:0.35 },
+      { ratio:5,    gain:0.2  },
+      { ratio:6,    gain:0.1  },
+    ],
+    attack:0.04, decay:0, sustain:1.0, release:0.12,
+    noise:0.01,
+  },
+  tuba: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:2,    gain:0.6  },
+      { ratio:3,    gain:0.3  },
+      { ratio:4,    gain:0.15 },
+      { ratio:5,    gain:0.07 },
+    ],
+    attack:0.055, decay:0, sustain:1.0, release:0.15,
+    noise:0.005,
+  },
+  // Strings: slow bow attack, rich harmonics, strong vibrato
+  strings: {
+    harmonics: [
+      { ratio:1,    gain:1.0  },
+      { ratio:2,    gain:0.6  },
+      { ratio:3,    gain:0.4  },
+      { ratio:4,    gain:0.25 },
+      { ratio:5,    gain:0.15 },
+      { ratio:6,    gain:0.08 },
+    ],
+    attack:0.12, decay:0, sustain:1.0, release:0.25,
+    noise:0.015,
+    vibrato: { rate:5.8, depth:0.018 },
+  },
+  // Snare drum: pitched noise burst (buzz) + low thump (head)
+  // Freq parameter is ignored — snare is unpitched
+  snare: {
+    harmonics: [], attack:0.001, decay:0.18, sustain:0.0, release:0.05,
+    noise:0, isPercussion: true, isSnare: true,
+  },
+  // Rolled snare: continuous noise sustained for full note duration
+  snareRoll: {
+    harmonics: [], attack:0.015, decay:0, sustain:1.0, release:0.06,
+    noise:0, isPercussion: true, isSnareRoll: true,
+  },
+  // Mallet roll (marimba tremolo): rapid re-strikes modelled as amplitude tremolo
+  marimbaRoll: {
+    harmonics: [
+      { ratio:1,  gain:1.0  },
+      { ratio:4,  gain:0.2  },
+      { ratio:10, gain:0.05 },
+    ],
+    attack:0.008, decay:0, sustain:0.85, release:0.06,
+    noise:0, isMalletRoll: true,
+  },
+};
+
+function playTone(ctx, t, dur, freq) {
+  const instr     = INSTRUMENTS[voiceId] || INSTRUMENTS.marimba;
+  const melodyOut = getMelodyGain();
+
+  // ── Rolled snare: rapid 32nd-note noise bursts ───────────────────────────
+  if(instr.isSnareRoll) {
+    const strike32 = secPerBeatGlobal * 0.125;
+    const numStr   = Math.max(2, Math.round(dur / strike32));
+    const strDur   = dur / numStr;
+
+    for(let i = 0; i < numStr; i++) {
+      const st   = t + i * strDur;
+      const sDur = Math.max(0.018, strDur * 0.72);
+
+      // ── Dynamic envelope: crescendo across the roll ──────────────────────
+      // Progress goes 0→1 over the roll duration
+      const progress  = numStr > 1 ? i / (numStr - 1) : 1;
+      // Base volume swells from 0.25 to 0.55 (crescendo)
+      const dynVol    = 0.25 + progress * 0.30;
+      // Slight accent on the very first strike
+      const strikeVol = i === 0 ? dynVol * 1.15 : dynVol;
+
+      // ── 1. Noise buzz layer (snare wires) ────────────────────────────────
+      const nBuf  = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * sDur), ctx.sampleRate);
+      const nData = nBuf.getChannelData(0);
+      for(let j = 0; j < nData.length; j++) nData[j] = Math.random() * 2 - 1;
+      const src  = ctx.createBufferSource();
+      const bpf  = ctx.createBiquadFilter();
+      const hpf  = ctx.createBiquadFilter();
+      const nGain = ctx.createGain();
+      bpf.type = 'bandpass'; bpf.frequency.value = 3200; bpf.Q.value = 0.7;
+      hpf.type = 'highpass'; hpf.frequency.value = 1400;
+      src.buffer = nBuf;
+      nGain.gain.setValueAtTime(strikeVol, st);
+      nGain.gain.exponentialRampToValueAtTime(0.001, st + sDur);
+      src.connect(bpf); bpf.connect(hpf); hpf.connect(nGain); nGain.connect(melodyOut);
+      src.start(st); src.stop(st + sDur + 0.01);
+
+      // ── 2. Thump layer (drum head) ────────────────────────────────────────
+      // Each strike has a small low-frequency body — quieter for mid-roll strikes,
+      // more present on first strike and crescendo peak
+      const thumpVol = strikeVol * 0.45;
+      const thumpDur = Math.min(0.055, sDur);
+      const thump    = ctx.createOscillator();
+      const tGain    = ctx.createGain();
+      thump.type = 'sine';
+      // Pitch drops from 180Hz to 70Hz — drum head impact
+      thump.frequency.setValueAtTime(180, st);
+      thump.frequency.exponentialRampToValueAtTime(70, st + thumpDur);
+      tGain.gain.setValueAtTime(thumpVol, st);
+      tGain.gain.exponentialRampToValueAtTime(0.001, st + thumpDur);
+      thump.connect(tGain); tGain.connect(melodyOut);
+      thump.start(st); thump.stop(st + thumpDur + 0.005);
+    }
+    return;
+  }
+
+  // ── Regular snare: short burst ────────────────────────────────────────────
+  if(instr.isSnare) {
+    const snareDur = Math.min(dur, 0.25);
+    const nBuf  = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * snareDur), ctx.sampleRate);
+    const nData = nBuf.getChannelData(0);
+    for(let i = 0; i < nData.length; i++) nData[i] = Math.random() * 2 - 1;
+    const nSrc  = ctx.createBufferSource();
+    const nBpf  = ctx.createBiquadFilter();
+    const nHpf  = ctx.createBiquadFilter();
+    const nGain = ctx.createGain();
+    nBpf.type = 'bandpass'; nBpf.frequency.value = 3000; nBpf.Q.value = 0.7;
+    nHpf.type = 'highpass'; nHpf.frequency.value = 1500;
+    nSrc.buffer = nBuf;
+    nGain.gain.setValueAtTime(0.55, t);
+    nGain.gain.exponentialRampToValueAtTime(0.001, t + snareDur * 0.9);
+    nSrc.connect(nBpf); nBpf.connect(nHpf); nHpf.connect(nGain); nGain.connect(melodyOut);
+    nSrc.start(t); nSrc.stop(t + snareDur);
+    const thumpOsc  = ctx.createOscillator();
+    const thumpGain = ctx.createGain();
+    thumpOsc.type = 'sine';
+    thumpOsc.frequency.setValueAtTime(200, t);
+    thumpOsc.frequency.exponentialRampToValueAtTime(80, t + 0.06);
+    thumpGain.gain.setValueAtTime(0.4, t);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    thumpOsc.connect(thumpGain); thumpGain.connect(melodyOut);
+    thumpOsc.start(t); thumpOsc.stop(t + 0.08);
+    return;
+  }
+
+  // ── Mallet roll: rapid 32nd-note mallet strikes ───────────────────────────
+  if(instr.isMalletRoll) {
+    const strike32 = secPerBeatGlobal * 0.125; // 32nd note duration at current tempo
+    const numStr   = Math.max(2, Math.round(dur / strike32));
+    const strDur   = dur / numStr;
+    const decayT   = Math.max(0.03, strDur * 0.65); // each strike decays within its slot
+    for(let i = 0; i < numStr; i++) {
+      const st  = t + i * strDur;
+      const vol = i === 0 ? 0.28 : 0.22; // slight accent on first stroke
+      instr.harmonics.forEach(({ ratio, gain: hGain }) => {
+        const osc = ctx.createOscillator();
+        const hGn = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.value = freq * ratio;
+        hGn.gain.setValueAtTime(0, st);
+        hGn.gain.linearRampToValueAtTime(vol * hGain, st + 0.006);
+        hGn.gain.exponentialRampToValueAtTime(0.001, st + decayT);
+        osc.connect(hGn); hGn.connect(melodyOut);
+        osc.start(st); osc.stop(st + decayT + 0.01);
+      });
+    }
+    return;
+  }
+
+  // ── Tonal instruments ─────────────────────────────────────────────────────
+  const master = ctx.createGain();
+  master.connect(melodyOut); // → melody master → destination
+
+  const atk     = instr.attack;
+  const dcy     = instr.decay;
+  const sus     = instr.sustain;
+  const rel     = instr.release;
+  const noteEnd = t + dur;
+  const vol     = 0.22; // base level — master gain node controls actual volume
+
+  master.gain.setValueAtTime(0, t);
+  master.gain.linearRampToValueAtTime(vol, t + atk);
+
+  if(dcy > 0 && sus < 1) {
+    master.gain.exponentialRampToValueAtTime(Math.max(0.0001, vol * sus), t + atk + dcy);
+    if(sus > 0) master.gain.setValueAtTime(vol * sus, noteEnd);
+  } else {
+    master.gain.setValueAtTime(vol, noteEnd);
+  }
+  master.gain.exponentialRampToValueAtTime(0.0001, noteEnd + rel);
+
+  let lfoGain = null;
+  if(instr.vibrato) {
+    const lfo = ctx.createOscillator();
+    lfoGain = ctx.createGain();
+    lfo.frequency.value = instr.vibrato.rate;
+    lfoGain.gain.value  = freq * instr.vibrato.depth;
+    lfo.connect(lfoGain);
+    lfo.start(t); lfo.stop(noteEnd + rel + 0.05);
+  }
+
+  instr.harmonics.forEach(({ ratio, gain: hGain }) => {
+    const osc = ctx.createOscillator();
+    const hGn = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq * ratio;
+    if(lfoGain) lfoGain.connect(osc.frequency);
+    hGn.gain.value = hGain;
+    osc.connect(hGn); hGn.connect(master);
+    osc.start(t); osc.stop(noteEnd + rel + 0.05);
+  });
+
+  if(instr.noise > 0) {
+    const bufSize = ctx.sampleRate * Math.min(dur + rel + 0.1, 3);
+    const buf     = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data    = buf.getChannelData(0);
+    for(let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src   = ctx.createBufferSource();
+    const bpf   = ctx.createBiquadFilter();
+    const nGain = ctx.createGain();
+    bpf.type = 'bandpass'; bpf.frequency.value = freq * 2; bpf.Q.value = 0.8;
+    nGain.gain.value = instr.noise;
+    src.buffer = buf;
+    src.connect(bpf); bpf.connect(nGain); nGain.connect(master);
+    src.start(t); src.stop(noteEnd + rel + 0.05);
+  }
+
+  master.gain.setValueAtTime(0, noteEnd + rel + 0.1);
+}
+
+// Metronome click — two distinct tones: high woodblock on beat 1, lower on beats 2-4
+function playClick(ctx, t, isDownbeat) {
+  const freq     = isDownbeat ? 1200 : 800;
+  const clickOut = getClickGain(); // routes through click master gain
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(clickOut);
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(isDownbeat ? 0.45 : 0.25, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+  osc.start(t); osc.stop(t + 0.045);
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  if(stopHandle) { clearTimeout(stopHandle); stopHandle = null; }
+  beatDotEls.forEach(d => d.classList.remove('on'));
+  document.getElementById('status').textContent = '';
+  // Close the AudioContext to immediately stop all scheduled audio nodes
+  if(audioCtx) {
+    audioCtx.close().catch(() => {});
+    audioCtx = null;
+    melodyMasterGain = null;
+    clickMasterGain  = null;
+  }
+}
+
+function startPlayback() {
+  if(!melody.length) { generate(); return; }
+  stopPlayback(); isPlaying = true;
+
+  const ctx        = getAC();
+  const ts         = getTimeSig();
+  const secPerBeat = 60 / getTempo();
+  secPerBeatGlobal = secPerBeat; // make available to roll synthesis
+  const now          = ctx.currentTime + 0.1;
+  const is6_8        = ts.id === '6_8';
+  // In 6/8: click on dotted-quarter beats (2 per measure, every 1.5 quarter-note beats)
+  const clicksPerMeasure = is6_8 ? 2 : ts.num;
+  const secPerClick      = is6_8 ? secPerBeat * 1.5 : secPerBeat;
+  const countInClicks    = countInOn ? clicksPerMeasure * 2 : 0;
+  const countInSecs      = countInClicks * secPerClick;
+
+  // ── Count-in clicks ───────────────────────────────────────────────────────
+  if(countInOn) {
+    for(let b = 0; b < countInClicks; b++) {
+      const t2 = now + b * secPerClick;
+      playClick(ctx, t2, b % clicksPerMeasure === 0);
+    }
+  }
+
+  // ── Steady metronome through the melody ──────────────────────────────────
+  const totalBeats  = ts.num * numMeasures;
+  const totalClicks = clicksPerMeasure * numMeasures;
+  for(let beat = 0; beat < totalClicks; beat++) {
+    const t2 = now + countInSecs + beat * secPerClick;
+    playClick(ctx, t2, (beat % clicksPerMeasure) === 0);
+  }
+
+  // ── Flatten note events ───────────────────────────────────────────────────
+  // For tied notes: accumulate the full tied duration into the tieStart event.
+  // tieStop slots contribute their duration to the previous tieStart but produce no sound.
+  const events = [];
+  let absoluteBeat = 0;
+  melody.forEach((placedGroups) => {
+    placedGroups.forEach(({ group, assignedPitches }) => {
+      let offsetBeats = 0;
+      let pendingTieEvent = null; // collects duration for tied note chain
+
+      group.slots.forEach((slot, si) => {
+        const slotBeats = xmlTypeSecs(slot.xmlType, slot.dots, 1)
+                        * (slot.tripletType ? (2/3) : 1); // triplets: 3 in space of 2
+        const t         = now + countInSecs + (absoluteBeat + offsetBeats) * secPerBeat;
+        const dur       = slotBeats * secPerBeat;
+        const ap        = assignedPitches[si];
+        const freq      = (!slot.isRest && ap) ? ap.pitch.freq  : null;
+        const freq2     = (!slot.isRest && ap && ap.pitch2) ? ap.pitch2.freq : null;
+        const beatFloat = absoluteBeat + offsetBeats;
+
+        if(slot.tieStop && pendingTieEvent) {
+          pendingTieEvent.dur += dur;
+          pendingTieEvent = null;
+        } else if(slot.tieStart) {
+          const ev = { t, freq, freq2, dur, beatFloat, isTieStart: true };
+          events.push(ev);
+          pendingTieEvent = ev;
+        } else {
+          events.push({ t, freq, freq2, dur, beatFloat });
+          pendingTieEvent = null;
+        }
+
+        offsetBeats += slotBeats;
+      });
+      absoluteBeat += group.beats;
+    });
+  });
+
+  // ── Schedule note audio ───────────────────────────────────────────────────
+  events.forEach(({ t, freq, freq2, dur }) => {
+    if(freq)  playTone(ctx, t, dur, freq);
+    if(freq2) playTone(ctx, t, dur, freq2);
+  });
+
+  // ── Cursor ────────────────────────────────────────────────────────────────
+  // OSMD cursor.reset() positions on note 1. cursor.next() moves to note 2.
+  // So: reset at melody start, then call next() starting from the SECOND event.
+  if(cursorOn && osmd) {
+    const cursorStartDelay = Math.max(0, (now + countInSecs - ctx.currentTime) * 1000 - 30);
+    setTimeout(() => {
+      if(!isPlaying) return;
+      try { osmd.cursor.reset(); osmd.cursor.show(); } catch(e) {}
+    }, cursorStartDelay);
+  }
+
+  // Step cursor: skip the first event (cursor already on note 1 after reset),
+  // call next() on each subsequent event to advance to that note
+  events.forEach(({ t }, idx) => {
+    if(idx === 0) return; // first note already shown by reset()
+    const delay = Math.max(0, (t - ctx.currentTime) * 1000);
+    setTimeout(() => {
+      if(!isPlaying) return;
+      if(cursorOn && osmd) { try { osmd.cursor.next(); } catch(e) {} }
+    }, delay);
+  });
+
+  const endT = now + countInSecs + totalBeats * secPerBeat;
+  stopHandle = setTimeout(() => {
+    if(isPlaying) stopPlayback();
+    if(cursorOn && osmd) { try { osmd.cursor.hide(); } catch(e) {} }
+  }, (endT - ctx.currentTime) * 1000 + 400);
+  document.getElementById('status').textContent = countInOn ? 'Count-in…' : 'Playing…';
+
+  // Update status after count-in
+  if(countInOn) {
+    setTimeout(() => {
+      if(isPlaying) document.getElementById('status').textContent = 'Playing…';
+    }, countInSecs * 1000);
+  }
+}
+
+
+function showError(msg) { const el=document.getElementById('error-msg'); el.textContent=msg; el.style.display='block'; }
+function hideError()    { document.getElementById('error-msg').style.display='none'; }
+
+document.getElementById('btnGen').addEventListener('click', generate);
+document.getElementById('btnPlay').addEventListener('click', startPlayback);
+document.getElementById('btnStop').addEventListener('click', stopPlayback);
+
+// ── PDF Save ──────────────────────────────────────────────────────────────────
+document.getElementById('btnPdf').addEventListener('click', function() {
+  // Populate the print header with current settings info
+  const ts  = getTimeSig();
+  const key = selectedKey === 'C' ? 'C major' : (KEY_SIGS.find(k=>k.id===selectedKey)||{label:selectedKey}).label;
+  document.getElementById('printInfo').textContent =
+    numMeasures + ' measures  ·  ' + ts.num + '/' + ts.denom +
+    '  ·  ' + getTempo() + ' BPM  ·  ' + key +
+    '  ·  ' + numLines + '-line ' + (clefId === 'none' ? 'no clef' : clefId) + ' staff';
+  // Trigger browser print dialog (user can Save as PDF from here)
+  window.print();
+});
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  // Don't fire if user is typing in an input
+  if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if(e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    isPlaying ? stopPlayback() : startPlayback();
+  }
+  if(e.key === 'm' || e.key === 'M') {
+    e.preventDefault();
+    generate();
+  }
+});
+
+// ── Reset to defaults ─────────────────────────────────────────────────────────
+function resetDefaults() {
+  clefId         = 'treble';
+  numLines       = 5;
+  timeSigId      = '4_4';
+  numMeasures    = 4;
+  activeNotes    = new Set(['half','quarter']);
+  activeRests    = new Set();
+  activeInterval = '2nd';
+  voiceId        = 'marimba';
+  selectedKey    = 'C';
+  useAccidentals = new Set();
+  rangeHighIdx   = 5;
+  rangeLowIdx    = 2;
+  tiesOn         = false;
+  doubleStopOn       = false;
+  doubleStopDensity  = 0.5;
+  doubleStopInterval = 3;
+  startOnTonic   = false;
+  endOnTonic     = false;
+  rhythmOnly     = false;
+  document.getElementById('chkStartOnTonic').checked = false;
+  document.getElementById('chkEndOnTonic').checked   = false;
+  countInOn      = false;
+  cursorOn       = false;
+  melodyVol      = 0.8;
+  clickVol       = 0.5;
+  document.getElementById('faderMelody').value = 80;
+  document.getElementById('faderMelodyVal').textContent = '80';
+  document.getElementById('faderClick').value  = 50;
+  document.getElementById('faderClickVal').textContent  = '50';
+  document.getElementById('btnCountIn').classList.remove('active');
+  document.getElementById('btnCursor').classList.remove('active');
+  // Ties auto-enabled from activeTies set — no checkbox to reset
+  document.getElementById('chkDoubleStop').checked              = false;
+  document.getElementById('doubleStopDensityWrap').style.display = 'none';
+  document.getElementById('doubleStopDensity').value            = 50;
+  document.getElementById('doubleStopDensityVal').textContent   = '50%';
+  // Rebuild all controls with reset state
+  osmd = null;
+  buildAll(); updateIntervalOptions(); buildKeyUI(); buildRangeUI();
+  buildSpecialGroupsWithSets();
+  generate();
+}
+document.getElementById('btnReset').addEventListener('click', resetDefaults);
+
+// ── Zoom controls ─────────────────────────────────────────────────────────────
+let zoomLevel = 1.0;
+const ZOOM_STEP = 0.1;
+const ZOOM_MIN  = 0.5;
+const ZOOM_MAX  = 2.0;
+
+function applyZoom() {
+  const wrap = document.getElementById('staff-scale-wrap');
+  if(!wrap) return;
+  wrap.style.transform = `scale(${zoomLevel})`;
+  // Adjust the wrapper's effective height so the card expands correctly
+  // (CSS transform doesn't affect layout flow, so we set an explicit height)
+  const inner = document.getElementById('osmd-container');
+  if(inner) {
+    const h = inner.offsetHeight;
+    if(h > 0) wrap.style.height = (h * zoomLevel) + 'px';
+  }
+  document.getElementById('zoomLabel').textContent = Math.round(zoomLevel * 100) + '%';
+}
+
+document.getElementById('btnZoomIn').addEventListener('click', () => {
+  zoomLevel = Math.min(ZOOM_MAX, Math.round((zoomLevel + ZOOM_STEP) * 10) / 10);
+  applyZoom();
+});
+document.getElementById('btnZoomOut').addEventListener('click', () => {
+  zoomLevel = Math.max(ZOOM_MIN, Math.round((zoomLevel - ZOOM_STEP) * 10) / 10);
+  applyZoom();
+});
+
+// ── Accordion toggle ──────────────────────────────────────────────────────────
+document.querySelectorAll('.acc-trigger').forEach(trigger => {
+  trigger.addEventListener('click', () => {
+    const bodyId = trigger.dataset.target;
+    const body   = document.getElementById(bodyId);
+    const isOpen = trigger.classList.contains('open');
+    trigger.classList.toggle('open', !isOpen);
+    body.classList.toggle('open', !isOpen);
+  });
+});
+
+window.addEventListener('load', function() {
+  if(typeof opensheetmusicdisplay === 'undefined') {
+    showError('Notation library failed to load. Check your internet connection and refresh.'); return;
+  }
+  restoreFromHash();
+  // On mobile, start with sidebar closed
+  if(isMobile()) { closeSidebar(); }
+  generate();
+});
+</script>
+</body>
+</html>
