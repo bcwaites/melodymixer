@@ -572,6 +572,7 @@ input[type=range].dual { width:100%; accent-color:#1A1A1A; }
       <span class="share-label">Link:</span>
       <input class="share-input" id="shareInput" type="text" readonly>
       <button class="share-copy" id="shareCopy" disabled>Copy</button>
+      <span id="shareStatus" style="font-size:10px;color:#9B9B9B;margin-left:6px;"></span>
     </div>
 
     <!-- ── Compact horizontal volume + tempo controls ── -->
@@ -1787,6 +1788,7 @@ document.getElementById('btnShare').addEventListener('click', async function() {
   inp.value       = longUrl;
   btn.textContent = 'Copy';
   btn.disabled    = false;
+  document.getElementById('shareStatus').textContent = '';
   bar.style.display = 'flex';
 
   // Shorten via TinyURL API directly
@@ -1809,10 +1811,18 @@ document.getElementById('btnShare').addEventListener('click', async function() {
       const data = await res.json();
       inp.value = data?.data?.tiny_url || longUrl;
     } else {
+      // Show HTTP error code so we can diagnose
+      const errText = await res.text().catch(() => '');
       inp.value = longUrl;
+      console.error('TinyURL API error:', res.status, errText);
+      document.getElementById('shareStatus').textContent = 'API error ' + res.status + ' — link copied as full URL';
     }
   } catch(e) {
     inp.value = longUrl;
+    console.error('TinyURL fetch error:', e.message);
+    // Show the actual error in the UI for diagnosis
+    document.getElementById('shareStatus').textContent =
+      e.name === 'AbortError' ? 'Timed out — using full URL' : 'Error: ' + e.message;
   }
   btn.disabled = false;
 });
