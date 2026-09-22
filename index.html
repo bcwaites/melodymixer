@@ -1766,63 +1766,57 @@ function decodeState(encoded) {
 
 // ── TinyURL shortener ─────────────────────────────────────────────────────────
 // ── Share button ──────────────────────────────────────────────────────────────
-// Share button — calls TinyURL API directly (works from GitHub Pages)
-const TINYURL_KEY = 'PmECNwNZgegS8bDmzmn5yCdwTLzlg3sUTZDgVPEBkvWnD0WdTrL8zPLyOYID';
-
+// Share button — uses TinyURL's simple GET API (no auth headers = no CORS preflight)
 document.getElementById('btnShare').addEventListener('click', async function() {
   const bar = document.getElementById('shareBar');
   const inp = document.getElementById('shareInput');
   const btn = document.getElementById('shareCopy');
+  const sts = document.getElementById('shareStatus');
 
   // Toggle — hide if already visible
   if(bar.style.display === 'flex') {
     bar.style.display = 'none'; return;
   }
 
-  // Build URL using the canonical GitHub Pages base
+  // Build the full URL
   const encoded = encodeState();
   const base    = 'https://bcwaites.github.io/melodymixer/';
   const longUrl = base + '#' + encoded;
 
-  // Show bar immediately — Copy always works as fallback
+  // Show bar immediately — Copy always works
   inp.value       = longUrl;
   btn.textContent = 'Copy';
   btn.disabled    = false;
-  document.getElementById('shareStatus').textContent = '';
+  sts.textContent = '';
   bar.style.display = 'flex';
 
-  // Shorten via TinyURL API directly
+  // Shorten using TinyURL's simple GET endpoint — no auth headers, no CORS preflight
   inp.value    = 'Shortening…';
   btn.disabled = true;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch('https://api.tinyurl.com/create', {
-      method:  'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': 'Bearer ' + TINYURL_KEY,
-      },
-      body:   JSON.stringify({ url: longUrl, domain: 'tinyurl.com' }),
-      signal: controller.signal,
-    });
+    const res = await fetch(
+      'https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl),
+      { signal: controller.signal }
+    );
     clearTimeout(timer);
     if(res.ok) {
-      const data = await res.json();
-      inp.value = data?.data?.tiny_url || longUrl;
+      const short = await res.text();
+      if(short && short.startsWith('http')) {
+        inp.value = short.trim();
+        sts.textContent = '';
+      } else {
+        inp.value = longUrl;
+        sts.textContent = 'Could not shorten — full URL copied';
+      }
     } else {
-      // Show HTTP error code so we can diagnose
-      const errText = await res.text().catch(() => '');
       inp.value = longUrl;
-      console.error('TinyURL API error:', res.status, errText);
-      document.getElementById('shareStatus').textContent = 'API error ' + res.status + ' — link copied as full URL';
+      sts.textContent = 'API error ' + res.status;
     }
   } catch(e) {
     inp.value = longUrl;
-    console.error('TinyURL fetch error:', e.message);
-    // Show the actual error in the UI for diagnosis
-    document.getElementById('shareStatus').textContent =
-      e.name === 'AbortError' ? 'Timed out — using full URL' : 'Error: ' + e.message;
+    sts.textContent = e.name === 'AbortError' ? 'Timed out' : e.message;
   }
   btn.disabled = false;
 });
