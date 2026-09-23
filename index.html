@@ -1766,7 +1766,7 @@ function decodeState(encoded) {
 
 // ── Share button — postMessage to Wix parent page for TinyURL shortening ─────
 // Falls back to Cloudflare Worker if not running inside Wix iframe
-const SHORTENER = 'https://melody-shortener.bcwaites.workers.dev/shorten';
+const SHORTENER = 'https://melody-shortener.bcwaites.workers.dev/';
 
 // Listen for short URL response from Wix parent page
 window.addEventListener('message', function(event) {
