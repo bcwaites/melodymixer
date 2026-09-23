@@ -1764,9 +1764,22 @@ function decodeState(encoded) {
   } catch(e) { console.warn('Could not decode state:', e); }
 }
 
-// ── TinyURL shortener ─────────────────────────────────────────────────────────
-// ── Share button ──────────────────────────────────────────────────────────────
-// Share button — uses TinyURL's simple GET API (no auth headers = no CORS preflight)
+// ── Share button — postMessage to Wix parent page for TinyURL shortening ─────
+// Falls back to Cloudflare Worker if not running inside Wix iframe
+const SHORTENER = 'https://melody-shortener.bcwaites.workers.dev/shorten';
+
+// Listen for short URL response from Wix parent page
+window.addEventListener('message', function(event) {
+  if(event.data && event.data.type === 'SHORT_URL') {
+    const inp = document.getElementById('shareInput');
+    const btn = document.getElementById('shareCopy');
+    const sts = document.getElementById('shareStatus');
+    inp.value    = event.data.short;
+    btn.disabled = false;
+    sts.textContent = '';
+  }
+});
+
 document.getElementById('btnShare').addEventListener('click', async function() {
   const bar = document.getElementById('shareBar');
   const inp = document.getElementById('shareInput');
@@ -1783,43 +1796,57 @@ document.getElementById('btnShare').addEventListener('click', async function() {
   const base    = 'https://bcwaites.github.io/melodymixer/';
   const longUrl = base + '#' + encoded;
 
-  // Show bar immediately — Copy always works
+  // Show bar immediately — Copy always works as fallback
   inp.value       = longUrl;
   btn.textContent = 'Copy';
   btn.disabled    = false;
   sts.textContent = '';
   bar.style.display = 'flex';
 
-  // Shorten using TinyURL's simple GET endpoint — no auth headers, no CORS preflight
+  // Try postMessage to Wix parent first (works when embedded in Wix)
   inp.value    = 'Shortening…';
   btn.disabled = true;
+
+  const inWix = window.parent !== window;
+  if(inWix) {
+    // Send to Wix page code which calls TinyURL server-side
+    window.parent.postMessage({ type: 'SHORTEN_URL', url: longUrl }, '*');
+    // If Wix doesn't respond within 5s, fall back to Cloudflare
+    setTimeout(async () => {
+      if(inp.value === 'Shortening…') {
+        await shortenViaCloudflare(longUrl, inp, btn, sts);
+      }
+    }, 5000);
+  } else {
+    // Running standalone (GitHub Pages direct) — use Cloudflare Worker
+    await shortenViaCloudflare(longUrl, inp, btn, sts);
+  }
+});
+
+async function shortenViaCloudflare(longUrl, inp, btn, sts) {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(
-      'https://tinyurl.com/api-create.php?url=' + encodeURIComponent(longUrl),
-      { signal: controller.signal }
-    );
+    const res = await fetch(SHORTENER, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ url: longUrl }),
+      signal:  controller.signal,
+    });
     clearTimeout(timer);
     if(res.ok) {
-      const short = await res.text();
-      if(short && short.startsWith('http')) {
-        inp.value = short.trim();
-        sts.textContent = '';
-      } else {
-        inp.value = longUrl;
-        sts.textContent = 'Could not shorten — full URL copied';
-      }
+      const data = await res.json();
+      inp.value = data.short || longUrl;
     } else {
       inp.value = longUrl;
-      sts.textContent = 'API error ' + res.status;
+      sts.textContent = 'Could not shorten — full URL ready to copy';
     }
   } catch(e) {
     inp.value = longUrl;
-    sts.textContent = e.name === 'AbortError' ? 'Timed out' : e.message;
+    sts.textContent = e.name === 'AbortError' ? 'Timed out — full URL ready' : '';
   }
   btn.disabled = false;
-});
+}
 
 document.getElementById('shareCopy').addEventListener('click', function() {
   const inp = document.getElementById('shareInput');
