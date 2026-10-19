@@ -1766,7 +1766,7 @@ function decodeState(encoded) {
 
 // ── Share button — postMessage to Wix parent page for TinyURL shortening ─────
 // Falls back to Cloudflare Worker if not running inside Wix iframe
-const SHORTENER = 'https://melody-shortener.bcwaites.workers.dev/';
+const SHORTENER = 'https://mw-links.bcwaites.workers.dev/';
 
 // Listen for short URL response from Wix parent page
 window.addEventListener('message', function(event) {
@@ -1807,7 +1807,7 @@ document.getElementById('btnShare').addEventListener('click', async function() {
   inp.value    = 'Shortening…';
   btn.disabled = true;
 
-  const inWix = window.parent !== window;
+  const inWix = false;
   if(inWix) {
     // Send to Wix page code which calls TinyURL server-side
     window.parent.postMessage({ type: 'SHORTEN_URL', url: longUrl }, '*');
