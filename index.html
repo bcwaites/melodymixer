@@ -2900,11 +2900,14 @@ function buildMusicXML() {
 //   - moved 6 units down the stem toward the notehead
 //   - each roll's slashes measured after drawing and shifted so their
 //     middle sits exactly on that note's stem (any size, stem up or down)
+//   - whole notes have no stem: their slashes always go above the notehead,
+//     centered over it
 // The slash-drawing code is only reachable through a drawn roll, so the
 // fix installs itself the first time a roll appears and that one render
 // is redrawn.
 const ROLL_SLASH_SCALE = 0.75;
 const ROLL_SLASH_LOWER = 6;
+const ROLL_SLASH_GAP   = 4;   // whole notes: space between the slashes and the notehead
 let rollSlashPatched = false;
 function installRollSlashPatch() {
   if(rollSlashPatched || !osmd || !osmd.GraphicSheet) return false;
@@ -2931,8 +2934,19 @@ function installRollSlashPatch() {
       ctx.closeGroup();
       try {
         const bb = g.getBBox();
-        const dx = this.note.getStemX() - (bb.x + bb.width / 2);
-        g.setAttribute('transform', 'translate(' + dx.toFixed(2) + ',0)');
+        const n  = this.note;
+        if(n.hasStem && !n.hasStem()) {
+          // Whole note (no stem): always ABOVE the notehead (Bryan), centered
+          // over it, ROLL_SLASH_GAP units clear of the head's top.
+          const cx  = (n.getNoteHeadBeginX() + n.getNoteHeadEndX()) / 2;
+          const top = Math.min.apply(null, n.getYs()) - 5; // head is one staff space tall
+          const dx  = cx - (bb.x + bb.width / 2);
+          const dy  = (top - ROLL_SLASH_GAP) - (bb.y + bb.height);
+          g.setAttribute('transform', 'translate(' + dx.toFixed(2) + ',' + dy.toFixed(2) + ')');
+        } else {
+          const dx = n.getStemX() - (bb.x + bb.width / 2);
+          g.setAttribute('transform', 'translate(' + dx.toFixed(2) + ',0)');
+        }
       } catch(e) {}
     };
   } catch(e) { return false; }
