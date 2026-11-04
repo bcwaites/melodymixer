@@ -2164,6 +2164,24 @@ function decodeState(encoded) {
   } catch(e) { console.warn('Could not decode state:', e); }
 }
 
+// ── Share links point at the Marimba Warehouse page (Bryan) ───────────────────
+// On marimbawarehouse.com this app runs inside a Wix page, but its own
+// address is still GitHub's, so share links used to send people to the bare
+// GitHub copy. When it's running inside the site, links now use the site
+// page instead; that page's Velo code hands the settings on to the app.
+// Opened anywhere else (GitHub directly, previews), links stay as they were.
+const MW_SITE_PAGE = "https://www.marimbawarehouse.com/melody";
+function mwInSite() {
+  try { if (window.self === window.top) return false; } catch (e) { /* cross-origin parent: we're framed */ }
+  const isSite = (u) => /^https?:\/\/([a-z0-9-]+\.)*marimbawarehouse\.com(\/|$)/i.test(u || "");
+  const anc = window.location.ancestorOrigins;
+  if (anc && anc.length) return Array.prototype.some.call(anc, isSite); // Chrome, Edge, Safari
+  return isSite(document.referrer); // other browsers
+}
+function mwShareBase() {
+  return mwInSite() ? MW_SITE_PAGE : window.location.origin + window.location.pathname;
+}
+
 // ── Share button — postMessage to Wix parent page for TinyURL shortening ─────
 // Falls back to Cloudflare Worker if not running inside Wix iframe
 const SHORTENER = 'https://mw-links.drumsunlimited.workers.dev/';
@@ -2193,8 +2211,10 @@ document.getElementById('btnShare').addEventListener('click', async function() {
 
   // Build the full URL
   const encoded = encodeState();
-  const base    = 'https://bcwaites.github.io/melodymixer/';
-  const longUrl = base + '#' + encoded;
+  // On marimbawarehouse.com the settings ride in ?mm= (the Wix page passes
+  // its query on to this app); everywhere else they stay after the #.
+  const longUrl = mwInSite() ? MW_SITE_PAGE + '?mm=' + encoded
+                             : 'https://bcwaites.github.io/melodymixer/#' + encoded;
 
   // Show bar immediately — Copy always works as fallback
   inp.value       = longUrl;
@@ -2260,7 +2280,10 @@ document.getElementById('shareCopy').addEventListener('click', function() {
 // ── Restore state from URL hash on load ──────────────────────────────────────
 function restoreFromHash() {
   try {
-    const hash = window.location.hash.slice(1);
+    // Settings arrive after the # (GitHub links) or as ?mm= (passed on by the
+    // marimbawarehouse.com page).
+    const mm   = new URLSearchParams(window.location.search).get('mm');
+    const hash = mm || window.location.hash.slice(1);
     if(!hash) return;
     // Support both new compact (base64) and legacy JSON format
     if(hash.startsWith('%7B') || hash.startsWith('{')) {
